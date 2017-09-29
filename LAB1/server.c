@@ -16,7 +16,7 @@ int main(int argc, char const *argv[])
 	
 	int sockfd;	
 	// open socket (DGRAM)
-	if ((sockfd = socket(PF_INET, SOCK_DGRAM, 0)) < 0) {
+	if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
 		fprintf(stderr, "socket error\n");
 		exit(1);
 	}
@@ -24,7 +24,7 @@ int main(int argc, char const *argv[])
 	struct sockaddr_in serv_addr;
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_port = htons(port);
-	serv_addr.sin_addr.s_addr = INADDR_ANY;	
+	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);	
 	memset(serv_addr.sin_zero, 0, sizeof(serv_addr.sin_zero));
 
 	// bind to socket
@@ -45,12 +45,12 @@ int main(int argc, char const *argv[])
 	
 	// send message to client based on message recevied
 	if (strcmp(buf, "ftp") == 0) {
-		if ((sendto(sockfd, "yes", strlen("yes"), 0, (struct sockaddr *) &cli_addr, sizeof(serv_addr))) == -1) {
+		if ((sendto(sockfd, "yes", strlen("yes"), 0, (struct sockaddr *) &cli_addr, sizeof(cli_addr))) == -1) {
 			fprintf(stderr, "sendto error\n");
 			exit(1);
 		}
 	} else {
-		if ((sendto(sockfd, "no", strlen("no"), 0, (struct sockaddr *) &cli_addr, sizeof(serv_addr))) == -1) {
+		if ((sendto(sockfd, "no", strlen("no"), 0, (struct sockaddr *) &cli_addr, sizeof(cli_addr))) == -1) {
 			fprintf(stderr, "sendto error\n");
 			exit(1);
 		}
