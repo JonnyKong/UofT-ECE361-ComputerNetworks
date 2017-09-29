@@ -24,7 +24,7 @@ int main(int argc, char const *argv[])
 	struct sockaddr_in serv_addr;
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_port = htons(port);
-	serv_addr.sin_addr.s_addr = INADDR_ANY;	// don't need to bind socket to specific IP
+	serv_addr.sin_addr.s_addr = INADDR_ANY;	
 	memset(serv_addr.sin_zero, 0, sizeof(serv_addr.sin_zero));
 
 	// bind to socket
