@@ -1,94 +1,89 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <unistd.h>
-#include <stdlib.h>
+#include <ctype.h>
 
-#define BUFFER_SIZE 100
-
-int main(int argc, char *argv[])
-{
-	struct addrinfo hints, *res, *p;
-    int status;
-    char send_msg[BUFFER_SIZE] = "ftp";     // Message to send
-    char rec_msg[BUFFER_SIZE];              // Message received
-    char file_name[BUFFER_SIZE];            // File name from user's input
-    char input_check[BUFFER_SIZE] = "ftp";  // Check if user input begins with ftp
-    int s;
-
-	if (argc != 3) {
-	    fprintf(stderr, "usage: showip hostname\n");
-	    return 1;
-    }
-
-    // Check input begins with ftp
-    scanf("%s", file_name);
-    if(strcmp(file_name, "ftp") != 0) {
-        fprintf(stderr, "usage: wrong input\n");
+int main(int argc, char const *argv[]) {
+    if (argc != 3) {
+        fprintf(stdout, "usage: deliver -<server address> -<server port number>\n");
         exit(1);
     }
-    scanf("%s", file_name);
+
+    int status;
+    struct addrinfo hints;
+    struct addrinfo *servinfo;  // will point to the results
     
-    // If file does not exist
-    if(access(file_name, F_OK) == -1) {
-        fprintf(stderr, "File does not exist!\n");
-        exit(2);
+    memset(&hints, 0, sizeof hints); // make sure that the structs are empty
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    // get ready to connect
+    if ((status = getaddrinfo(argv[1], argv[2], &hints, &servinfo )) != 0) {
+        fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
+        exit(1);
     }
+
+    // servinfo now points to a linked list of 1 or more struct addrinfos
+    int sockfd; // socket file descriptor
+    if ((sockfd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol)) < 0) {
+        fprintf(stderr, "socket error: %s\n", strerror(status));
+        exit(1);
+    }
+
+    const int BUF_SIZE = 100;
+    char buf[BUF_SIZE] = {0};
+    char filename[BUF_SIZE] = {0};
+
+    // get user input
+    fgets(buf, BUF_SIZE, stdin);
+
+    int cursor = 0;
+    while(buf[cursor] == ' ') { // skip whitespaces at start
+        cursor++;
+    }
+    if(tolower(buf[cursor]) == 'f' && tolower(buf[cursor + 1]) == 't' && tolower(buf[cursor + 2]) == 'p') {
+        cursor = 3;
+        while (buf[cursor] == ' ') { // skip whitespaces inbetween
+            cursor++;
+        }
+        char *token = strtok(buf + cursor, "\r\t\n ");
+        strncpy(filename, token, BUF_SIZE);
+    } else {
+        fprintf(stderr, "Starter \"ftp\" undeteceted.\n");
+        exit(1);
+    }
+
+    // Eligibility check of the file  
+    if(access(filename, F_OK) == -1) {
+        fprintf(stderr, "File \"%s\" doesn't exist.\n", filename);
+        exit(1);
+    }
+
+    int numbytes;
+    if((numbytes = sendto(sockfd, "ftp", strlen("ftp"), 0, servinfo->ai_addr, servinfo->ai_addrlen)) == -1){
+        fprintf(stderr, "sendto error\n");
+        exit(1);
+    };
+
+    memset(buf, 0, BUF_SIZE * sizeof(buf)); // clean the buffer
+    struct sockaddr_in serv_addr;
+    socklen_t serv_addr_size = sizeof(serv_addr);
+    if((numbytes = recvfrom(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *) &serv_addr, &serv_addr_size)) == -1) {
+        fprintf(stderr, "recvfrom error\n");
+        exit(1);
+    }
+
+    if(strcmp(buf, "yes") == 0) {
+        fprintf(stdout, "A file transfer can start\n");
+    }
+
+    freeaddrinfo(servinfo);
+    close(sockfd);
     
-    // Setup destination address info
-    memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC; // AF_INET or AF_INET6 to force version
-	hints.ai_socktype = SOCK_DGRAM;
-    if ((status = getaddrinfo(argv[1], argv[2], &hints, &res)) != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
-        puts("Error getting server address\n");
-        exit(3);
-    }
-
-    // Setup socket
-    if((s = socket(res -> ai_family, res -> ai_socktype, res -> ai_protocol)) < 0) {
-        fprintf(stderr, "socket:");
-        puts("Error setting up socket\n");
-        exit(4);
-    }
-
-    // Establish connection
-    if((status = connect(s, res->ai_addr, res->ai_addrlen)) != 0) {
-        fprintf(stderr, "connect:");
-        puts("Error establishing connection\n");
-        exit(5);
-    }
-
-    // Send message
-    if((status = send(s, send_msg, strlen(send_msg), 0)) < 0) {
-        fprintf(stderr, "send:");
-        puts("Error sending\n");
-        exit(6);
-    }
-
-    // Receive message
-    memset(rec_msg, 0, sizeof(char) * BUFFER_SIZE);
-    status = recv(s, rec_msg, BUFFER_SIZE, 0);
-    if(status == 0) {
-        fprintf(stderr, "Error: Connection Closed\n");
-        exit(0);
-    }
-    else if(status < 0) {
-        fprintf(stderr, "Error: recv %d\n", status);
-    }
-
-    if(strcmp(rec_msg, "yes") == 0) {
-        puts("A file transfer can start\n");
-    }
-    else {
-        exit(7);
-    }
-
-    // Close the socket
-    close(s);
-	return 0;
+    return 0;
 }
