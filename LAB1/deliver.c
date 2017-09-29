@@ -70,7 +70,7 @@ int main(int argc, char const *argv[]) {
         exit(1);
     };
 
-    memset(buf, 0, BUF_SIZE * sizeof(buf)); // clean the buffer
+    memset(buf, 0, BUF_SIZE); // clean the buffer
     struct sockaddr_in serv_addr;
     socklen_t serv_addr_size = sizeof(serv_addr);
     if((numbytes = recvfrom(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *) &serv_addr, &serv_addr_size)) == -1) {
