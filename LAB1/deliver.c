@@ -71,16 +71,14 @@ int main(int argc, char *argv[])
     }
 
     // Receive message
-    while(1){
-        memset(rec_msg, 0, sizeof(char) * BUFFER_SIZE);
-        status = recv(s, rec_msg, BUFFER_SIZE, 0);
-        if(status == 0) {
-            fprintf(stderr, "Error: Connection Closed\n");
-            exit(0);
-        }
-        else if(status < 0) {
-            fprintf(stderr, "Error: recv %d\n", status);
-        }
+    memset(rec_msg, 0, sizeof(char) * BUFFER_SIZE);
+    status = recv(s, rec_msg, BUFFER_SIZE, 0);
+    if(status == 0) {
+        fprintf(stderr, "Error: Connection Closed\n");
+        exit(0);
+    }
+    else if(status < 0) {
+        fprintf(stderr, "Error: recv %d\n", status);
     }
 
     if(strcmp(rec_msg, "yes") == 0) {
