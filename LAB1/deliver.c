@@ -47,7 +47,7 @@ int main(int argc, char const *argv[]) {
         cursor++;
     }
     if(tolower(buf[cursor]) == 'f' && tolower(buf[cursor + 1]) == 't' && tolower(buf[cursor + 2]) == 'p') {
-        cursor = 3;
+        cursor += 3;
         while (buf[cursor] == ' ') { // skip whitespaces inbetween
             cursor++;
         }
