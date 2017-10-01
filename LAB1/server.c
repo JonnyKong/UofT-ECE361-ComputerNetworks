@@ -10,7 +10,7 @@ int main(int argc, char const *argv[])
 {
 	if (argc != 2) { 
 		fprintf(stdout, "usage: server -<UDP listen port>\n");
-		exit(1);
+		exit(0);
 	}
 	int port = atoi(argv[1]);
 	
@@ -43,7 +43,7 @@ int main(int argc, char const *argv[])
 		exit(1);
 	}
 	
-	// send message to client based on message recevied
+	// send message back to client based on message recevied
 	if (strcmp(buf, "ftp") == 0) {
 		if ((sendto(sockfd, "yes", strlen("yes"), 0, (struct sockaddr *) &cli_addr, sizeof(cli_addr))) == -1) {
 			fprintf(stderr, "sendto error\n");

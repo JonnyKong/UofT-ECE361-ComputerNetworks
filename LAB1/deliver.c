@@ -13,11 +13,12 @@ int main(int argc, char const *argv[])
 {
     if (argc != 3) {
         fprintf(stdout, "usage: deliver -<server address> -<server port number>\n");
-        exit(1);
+        exit(0);
     }
     int port = atoi(argv[2]);
  
     int sockfd;
+    // open socket (DGRAM)
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         fprintf(stderr, "socket error\n");
         exit(1);
