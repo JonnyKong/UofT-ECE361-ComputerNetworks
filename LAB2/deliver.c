@@ -64,6 +64,8 @@ int main(int argc, char const *argv[])
 
     int numbytes;
     // send the message
+    clock_t start, end;  // timer variables
+    start = clock();
     if ((numbytes = sendto(sockfd, "ftp", strlen("ftp") , 0 , (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1) {
         fprintf(stderr, "sendto error\n");
         exit(1);
@@ -75,6 +77,8 @@ int main(int argc, char const *argv[])
         fprintf(stderr, "recvfrom error\n");
         exit(1);
     }
+    end = clock();
+    fprintf(stdout, "RTT = %f sec.\n", ((double) (end - start) / CLOCKS_PER_SEC));  
 
     if(strcmp(buf, "yes") == 0) {
         fprintf(stdout, "A file transfer can start\n");
