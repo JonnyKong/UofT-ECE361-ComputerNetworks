@@ -9,24 +9,27 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <time.h>
+#include <errno.h>
 
 #include "packet.h"
 
-#define SEND_BUF_SIZE 1000
+#define ALIVE 10
+
 
 // Convert packet to string
 
-void send_file(char *filename, int sockfd, struct sockaddr_in *serv_addr) {
+void send_file(char *filename, int sockfd, struct sockaddr_in serv_addr) {
 
     // Open file
     FILE *fp;
     if((fp = fopen(filename, "r")) == NULL) {
-        fprintf(stderr, "Can't open input file %s", filename);
+        fprintf(stderr, "Can't open input file %s\n", filename);
+        exit(1);
     }
-    printf("Opened file %s\n", filename);
+    // printf("Successfully opened file %s\n", filename);
 
 
-    // Calculate total number of packets
+    // Calculate total number of packets required
     fseek(fp, 0, SEEK_END);
     int total_frag = ftell(fp) / 1000 + 1;
     printf("Number of packets: %d\n", total_frag);
@@ -34,26 +37,25 @@ void send_file(char *filename, int sockfd, struct sockaddr_in *serv_addr) {
 
 
     // Read file into packets, and save in packets array
-    char rec_buf[SEND_BUF_SIZE + 100];                      // Buffer for receiving packets
+    char rec_buf[BUF_SIZE];                                 // Buffer for receiving packets
     char **packets = malloc(sizeof(char*) * total_frag);    // Stores packets for retransmitting
 
     for(int packet_num = 1; packet_num <= total_frag; ++packet_num) {
 
-        printf("Preparing packet #%d/%d...\n", packet_num, total_frag);
+        // printf("Preparing packet #%d / %d...\n", packet_num, total_frag);
 
         // Create Packet
         Packet packet;
-        memset(packet.filedata, 0, sizeof(char) * (SEND_BUF_SIZE));
-        fread((void*)packet.filedata, sizeof(char), SEND_BUF_SIZE, fp);
+        memset(packet.filedata, 0, sizeof(char) * (DATA_SIZE));
+        fread((void*)packet.filedata, sizeof(char), DATA_SIZE, fp);
 
         // Update packet info
         packet.total_frag = total_frag;
         packet.frag_no = packet_num;
         packet.filename = filename;
-        // memcpy(packet.filename, filename, strlen(filename));
         if(packet_num != total_frag) {
             // This packet is not the last packet
-            packet.size = SEND_BUF_SIZE;
+            packet.size = DATA_SIZE;
         }
         else {
             // This packet is the last packet
@@ -62,45 +64,79 @@ void send_file(char *filename, int sockfd, struct sockaddr_in *serv_addr) {
         }
 
         // Save packet to packets array
-        packets[packet_num - 1] = packetToString(&packet);
-        // printf("%s\n", packets[packet_num - 1]);
+        packets[packet_num - 1] = malloc(BUF_SIZE * sizeof(char));
+        packetToString(&packet, packets[packet_num - 1]);
 
     }    
 
 
     // Send packets and receive acknowledgements
-    socklen_t serv_addr_size = sizeof(*serv_addr);
+
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+        fprintf(stderr, "setsockopt failed\n");
+    }
+    int timesent = 0;   // Number of times a packet is sent
+    socklen_t serv_addr_size = sizeof(serv_addr);
+
+    Packet ack_packet;  // Packet receiveds
+    ack_packet.filename = (char *)malloc(BUF_SIZE * sizeof(char));
+
     for(int packet_num = 1; packet_num <= total_frag; ++packet_num) {
 
-        int numbytes;
-        int packetLength = strlen(packets[packet_num - 1]);
+        int numbytes;       // Return value of sendto and recvfrom
+        ++timesent;
 
         // Send packets
-        printf("Sending packet #%d/%d...\n", packet_num, total_frag);
-        if((numbytes = sendto(sockfd, packets[packet_num - 1], packetLength, 0 , (struct sockaddr *) serv_addr, sizeof(*serv_addr))) == -1) {
+        // printf("Sending packet #%d / %d...\n", packet_num, total_frag);
+        if((numbytes = sendto(sockfd, packets[packet_num - 1], BUF_SIZE, 0 , (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1) {
             fprintf(stderr, "sendto error for packet #%d\n", packet_num);
+            exit(1);
         }
 
         // Receive acknowledgements
-        memset(rec_buf, 0, sizeof(char) * (SEND_BUF_SIZE + 100));
-        if((numbytes = recvfrom(sockfd, rec_buf, SEND_BUF_SIZE + 100, 0, (struct sockaddr *) serv_addr, &serv_addr_size)) == -1) {
-            fprintf(stderr, "recvfrom error for ACK #%d\n", packet_num);
+        memset(rec_buf, 0, sizeof(char) * BUF_SIZE);
+        if((numbytes = recvfrom(sockfd, rec_buf, BUF_SIZE, 0, (struct sockaddr *) &serv_addr, &serv_addr_size)) == -1) {
+            // Resend if timeout
+            fprintf(stderr, "Timeout or recvfrom error for ACK packet #%d, resending attempt #%d...\n", packet_num--, timesent);
+            if(timesent < ALIVE){
+                continue;
+            }
+            else {
+                fprintf(stderr, "Too many resends. File transfer terminated.\n");
+                exit(1);
+            }
         }
         
-        Packet ack_packet;
-        stringToPacket(rec_buf, ack_packet);
+        stringToPacket(rec_buf, &ack_packet);
         
-        // Check for ack packets
-        
+        // Check contents of ACK packets
+        if(strcmp(ack_packet.filename, filename) == 0) {
+            if(ack_packet.frag_no == packet_num) {
+                if(strcmp(ack_packet.filedata, "ACK") == 0) {
+                    // printf("ACK packet #%d received\n", packet_num);
+                    timesent = 0;
+                    continue;
+                }
+            }
+        }
+
+        // Resend packet
+        fprintf(stderr, "ACK packet #%d not received, resending attempt #%d...\n", packet_num, timesent);
+        --packet_num;
 
     }
     
 
-    // Free packets memory after file transfer is completed
+    // Free memory
     for(int packet_num = 1; packet_num <= total_frag; ++packet_num) {
         free(packets[packet_num - 1]);
     }
     free(packets);
+
+    free(ack_packet.filename);
 
 }
 
@@ -130,7 +166,6 @@ int main(int argc, char const *argv[])
         exit(1);
     }
  
-    const int BUF_SIZE = 100;
     char buf[BUF_SIZE] = {0};
     char filename[BUF_SIZE] = {0};
 
@@ -179,15 +214,17 @@ int main(int argc, char const *argv[])
     if(strcmp(buf, "yes") == 0) {
         fprintf(stdout, "A file transfer can start\n");
     }
-
+    else {
+        fprintf(stderr, "Error: File transfer can't start\n");
+    }
 
 
     // Begin sending file and check for acknowledgements
-    send_file(filename, sockfd, &serv_addr);
-
+    send_file(filename, sockfd, serv_addr);
     
-
+    // Sending Completed
     close(sockfd);
+    printf("File Transfer Completed, SocketClosed.\n");
     
     return 0;
 }
