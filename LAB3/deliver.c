@@ -13,7 +13,7 @@
 
 #include "packet.h"
 
-#define ALIVE 10
+#define ALIVE 32
 
 
 // Convert packet to string
