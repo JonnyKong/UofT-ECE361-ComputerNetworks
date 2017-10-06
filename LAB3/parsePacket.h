@@ -7,7 +7,7 @@
 
 #define SEND_BUF_SIZE 1000
 
-char *packetToString(Packet *packet) {
+char *packetToString(const Packet *packet) {
     
     // Initialize string buffer
     const int buffer_size = SEND_BUF_SIZE + 100;
