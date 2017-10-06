@@ -49,9 +49,6 @@ void packetToString(const Packet *packet, char *result) {
 }
 
 void stringToPacket(const char* str, Packet *packet) {
-    
-    // Initialize Packet
-    memset(packet, 0, sizeof(*packet));
 
     // Compile Regex to match ":"
     regex_t regex;
@@ -99,11 +96,12 @@ void stringToPacket(const char* str, Packet *packet) {
         fprintf(stderr, "Error matching regex\n");
         exit(1);
     }
-    // memcpy(packet -> filename, str + cursor, pmatch[0].rm_so);
-    memcpy(buf, str + cursor, pmatch[0].rm_so);
-    packet -> filename = buf;
-    cursor += (pmatch[0].rm_so + 1);
 
+
+    memcpy(packet -> filename, str + cursor, pmatch[0].rm_so);
+    packet -> filename[pmatch[0].rm_so] = 0;
+    cursor += (pmatch[0].rm_so + 1);
+    
     // Match filedata
     memcpy(packet -> filedata, str + cursor, packet -> size);
 
@@ -113,4 +111,11 @@ void stringToPacket(const char* str, Packet *packet) {
     // printf("filename:\t%s\n", packet -> filename);
     // printf("filedata:\t%s\n", packet -> filedata);
 
+}
+
+void printPacket(Packet *packet) {
+    printf("total_frag = %d,\n frag_no = %d, size = %d, filename = %s\n", packet->total_frag, packet->frag_no, packet->size, packet->filename);
+    char buf[BUF_SIZE + 1] = {0};
+    memcpy(buf, packet->filedata, BUF_SIZE);
+    printf("%s", buf);
 }
