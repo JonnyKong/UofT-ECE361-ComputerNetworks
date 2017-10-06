@@ -10,8 +10,7 @@
 #include <ctype.h>
 #include <time.h>
 
-// #include "packet.h"
-#include "parsePacket.h"
+#include "packet.h"
 
 #define SEND_BUF_SIZE 1000
 
@@ -35,7 +34,7 @@ void send_file(char *filename, int sockfd, struct sockaddr_in *serv_addr) {
 
 
     // Read file into packets, and save in packets array
-    char send_buf[SEND_BUF_SIZE + 1];                           // Buffer for processing segments
+    char rec_buf[SEND_BUF_SIZE + 100];                      // Buffer for receiving packets
     char **packets = malloc(sizeof(char*) * total_frag);    // Stores packets for retransmitting
 
     for(int packet_num = 1; packet_num <= total_frag; ++packet_num) {
@@ -69,14 +68,31 @@ void send_file(char *filename, int sockfd, struct sockaddr_in *serv_addr) {
     }    
 
 
-    // Send packets
+    // Send packets and receive acknowledgements
+    socklen_t serv_addr_size = sizeof(*serv_addr);
     for(int packet_num = 1; packet_num <= total_frag; ++packet_num) {
+
         int numbytes;
         int packetLength = strlen(packets[packet_num - 1]);
+
+        // Send packets
         printf("Sending packet #%d/%d...\n", packet_num, total_frag);
         if((numbytes = sendto(sockfd, packets[packet_num - 1], packetLength, 0 , (struct sockaddr *) serv_addr, sizeof(*serv_addr))) == -1) {
             fprintf(stderr, "sendto error for packet #%d\n", packet_num);
         }
+
+        // Receive acknowledgements
+        memset(rec_buf, 0, sizeof(char) * (SEND_BUF_SIZE + 100));
+        if((numbytes = recvfrom(sockfd, rec_buf, SEND_BUF_SIZE + 100, 0, (struct sockaddr *) serv_addr, &serv_addr_size)) == -1) {
+            fprintf(stderr, "recvfrom error for ACK #%d\n", packet_num);
+        }
+        
+        Packet ack_packet;
+        stringToPacket(rec_buf, ack_packet);
+        
+        // Check for ack packets
+        
+
     }
     
 
@@ -151,23 +167,24 @@ int main(int argc, char const *argv[])
         exit(1);
     }
     
-    // memset(buf, 0, BUF_SIZE); // clean the buffer
-    // socklen_t serv_addr_size = sizeof(serv_addr);
-    // if((numbytes = recvfrom(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *) &serv_addr, &serv_addr_size)) == -1) {
-    //     fprintf(stderr, "recvfrom error\n");
-    //     exit(1);
-    // }
-    // end = clock();
-    // fprintf(stdout, "RTT = %f sec.\n", ((double) (end - start) / CLOCKS_PER_SEC));  
+    memset(buf, 0, BUF_SIZE); // clean the buffer
+    socklen_t serv_addr_size = sizeof(serv_addr);
+    if((numbytes = recvfrom(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *) &serv_addr, &serv_addr_size)) == -1) {
+        fprintf(stderr, "recvfrom error\n");
+        exit(1);
+    }
+    end = clock();
+    fprintf(stdout, "RTT = %f sec.\n", ((double) (end - start) / CLOCKS_PER_SEC));  
 
-    // if(strcmp(buf, "yes") == 0) {
-    //     fprintf(stdout, "A file transfer can start\n");
-    // }
+    if(strcmp(buf, "yes") == 0) {
+        fprintf(stdout, "A file transfer can start\n");
+    }
 
+
+
+    // Begin sending file and check for acknowledgements
     send_file(filename, sockfd, &serv_addr);
 
-
-    // Check for acknowledgements
     
 
     close(sockfd);

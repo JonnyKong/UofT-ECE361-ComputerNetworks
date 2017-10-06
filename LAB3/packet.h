@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <regex.h>
 
+#define SEND_BUF_SIZE 1100
+#define DATA_SIZE 1000
+
 
 typedef struct tagPacket {
 	unsigned int total_frag;
@@ -12,13 +15,11 @@ typedef struct tagPacket {
 	char filedata[1000]; 
 } Packet;
 
-#define SEND_BUF_SIZE 1000
-char *packetToString(const Packet *packet) {
+
+void packetToString(const Packet *packet, char *result) {
     
     // Initialize string buffer
-    const int buffer_size = SEND_BUF_SIZE + 100;
-    char* result = malloc(buffer_size * sizeof(char));
-    memset(result, 0, sizeof(char) * buffer_size);
+    memset(result, 0, SEND_BUF_SIZE);
 
     // Load data into string
     int cursor = 0;
@@ -42,11 +43,10 @@ char *packetToString(const Packet *packet) {
     memcpy(result + cursor, ":", sizeof(char));
     ++cursor;
 
-    memcpy(result + cursor, packet -> filedata, sizeof(char) * SEND_BUF_SIZE);
+    memcpy(result + cursor, packet -> filedata, sizeof(char) * DATA_SIZE);
 
     // printf("%s\n", packet -> filedata);
     // printf("Length of data: %d\n", strlen(packet -> filedata));
-    return result;
 
 }
 
