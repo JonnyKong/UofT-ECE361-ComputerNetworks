@@ -115,7 +115,7 @@ void stringToPacket(const char* str, Packet *packet) {
 
 void printPacket(Packet *packet) {
     printf("total_frag = %d,\n frag_no = %d, size = %d, filename = %s\n", packet->total_frag, packet->frag_no, packet->size, packet->filename);
-    char buf[BUF_SIZE + 1] = {0};
-    memcpy(buf, packet->filedata, BUF_SIZE);
-    printf("%s", buf);
+    char data[DATA_SIZE + 1] = {0};
+    memcpy(data, packet->filedata, DATA_SIZE);
+    printf("%s", data);
 }
