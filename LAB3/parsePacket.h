@@ -44,10 +44,10 @@ char *packetToString(Packet *packet) {
 
 }
 
-Packet stringToPacket(const char* str) {
+void stringToPacket(const char* str, Packet *packet) {
     
     // Initialize Packet
-    Packet packet;
+    memset(packet, 0, sizeof(*packet));
 
     // Compile Regex to match ":"
     regex_t regex;
@@ -64,45 +64,50 @@ Packet stringToPacket(const char* str) {
     // Match total_frag
     if(regexec(&regex, str + cursor, 1, pmatch, REG_NOTBOL)) {
         fprintf(stderr, "Error matching regex\n");
+        exit(1);
     }
     memset(tmp, 0, 50 * sizeof(char));
     memcpy(tmp, str + cursor, pmatch[0].rm_so);
-    packet.total_frag = atoi(tmp);
+    packet -> total_frag = atoi(tmp);
     cursor += (pmatch[0].rm_so + 1);
 
     // Match frag_no
     if(regexec(&regex, str + cursor, 1, pmatch, REG_NOTBOL)) {
         fprintf(stderr, "Error matching regex\n");
+        exit(1);
     }
     memset(tmp, 0, 50 * sizeof(char));
     memcpy(tmp, str + cursor, pmatch[0].rm_so);
-    packet.frag_no = atoi(tmp);
+    packet -> frag_no = atoi(tmp);
     cursor += (pmatch[0].rm_so + 1);
 
     // Match size
     if(regexec(&regex, str + cursor, 1, pmatch, REG_NOTBOL)) {
         fprintf(stderr, "Error matching regex\n");
+        exit(1);
     }
     memset(tmp, 0, 50 * sizeof(char));
     memcpy(tmp, str + cursor, pmatch[0].rm_so);
-    packet.size = atoi(tmp);
+    packet -> size = atoi(tmp);
     cursor += (pmatch[0].rm_so + 1);
 
     // Match filename
     if(regexec(&regex, str + cursor, 1, pmatch, REG_NOTBOL)) {
         fprintf(stderr, "Error matching regex\n");
+        exit(1);
     }
-    memcpy(packet.filename, str + cursor, pmatch[0].rm_so);
+    // memcpy(packet -> filename, str + cursor, pmatch[0].rm_so);
+    memcpy(tmp, str + cursor, pmatch[0].rm_so);
+    packet -> filename = tmp;
     cursor += (pmatch[0].rm_so + 1);
 
     // Match filedata
-    memcpy(packet.filedata, str + cursor, packet.size);
+    memcpy(packet -> filedata, str + cursor, packet -> size);
 
-    // printf("total_frag:\t%d\n", packet.total_frag);
-    // printf("frag_no:\t%d\n", packet.frag_no);
-    // printf("size:\t%d\n", packet.size);
-    // printf("filename:\t%s\n", packet.filename);
-    // printf("filedata:\t%s\n", packet.filedata);
+    // printf("total_frag:\t%d\n", packet -> total_frag);
+    // printf("frag_no:\t%d\n", packet -> frag_no);
+    // printf("size:\t%d\n", packet -> size);
+    // printf("filename:\t%s\n", packet -> filename);
+    // printf("filedata:\t%s\n", packet -> filedata);
 
-    return packet;
 }

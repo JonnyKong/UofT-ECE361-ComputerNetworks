@@ -50,8 +50,8 @@ void send_file(char *filename, int sockfd, struct sockaddr_in *serv_addr) {
         // Update packet info
         packet.total_frag = total_frag;
         packet.frag_no = packet_num;
-        // packet.filename = filename;
-        memcpy(packet.filename, filename, strlen(filename));
+        packet.filename = filename;
+        // memcpy(packet.filename, filename, strlen(filename));
         if(packet_num != total_frag) {
             // This packet is not the last packet
             packet.size = SEND_BUF_SIZE;
@@ -64,7 +64,7 @@ void send_file(char *filename, int sockfd, struct sockaddr_in *serv_addr) {
 
         // Save packet to packets array
         packets[packet_num - 1] = packetToString(&packet);
-        printf("%s\n", packets[packet_num - 1]);
+        // printf("%s\n", packets[packet_num - 1]);
 
     }    
 
@@ -164,7 +164,7 @@ int main(int argc, char const *argv[])
     //     fprintf(stdout, "A file transfer can start\n");
     // }
 
-    // send_file(filename, sockfd, &serv_addr);
+    send_file(filename, sockfd, &serv_addr);
 
 
     // Check for acknowledgements
