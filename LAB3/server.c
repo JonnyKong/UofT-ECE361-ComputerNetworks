@@ -5,6 +5,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <stdbool.h>
+#include "packet.h"
 
 int main(int argc, char const *argv[])
 {
@@ -33,7 +35,6 @@ int main(int argc, char const *argv[])
 		exit(1);
 	}
 	
-	const int BUF_SIZE = 100;
 	char buf[BUF_SIZE] = {0};
 	struct sockaddr_in cli_addr; 
 	socklen_t clilen; // length of client info
@@ -56,10 +57,44 @@ int main(int argc, char const *argv[])
 		}
 	}
 
-	close(sockfd);
-	return 0;
-}
+	Packet packet;
+	FILE *pFile = NULL;
+	bool *fragRecv = NULL;
+	for (;;) {
+		if (recvfrom(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *) &cli_addr, &clilen) == -1) {
+			fprintf(stderr, "recvfrom error\n");
+			exit(1);
+		}
+		stringToPacket(buf, &packet);
+		if (!pFile) {
+			pFile = fopen(packet.filename, "wb");
+		}
+		if (!fragRecv) {
+			fragRecv = (bool *) malloc(packet.total_frag * sizeof(fragRecv));
+			for (int i = 0; i < packet.total_frag; i++) {
+				fragRecv[i] = false;
+			}
+		}
+		if (!fragRecv[packet.frag_no]) {
+			if (fwrite(packet.filedata, sizeof(char), packet.size, pFile) != packet.size) {
+				fprintf(stderr, "fwrite error\n");
+				exit(1);
+			}
+			fragRecv[packet.frag_no] = true;
+		}
+		strcpy(packet.filedata, "ACK");
+		packetToString(&packet, buf);
+		if ((sendto(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *) &cli_addr, sizeof(cli_addr))) == -1) {
+			fprintf(stderr, "sendto error\n");
+			exit(1);
+		}
+		if (packet.frag_no == packet.total_frag) {
+			fprintf(stdout, "File transfer completed in %s\n", packet.filename);
+		}
+	}
 
-void send_file(char *filename) {
-	
+	close(sockfd);
+	fclose(pFile);
+	free(fragRecv);
+	return 0;
 }

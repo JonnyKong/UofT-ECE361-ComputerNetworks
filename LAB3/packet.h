@@ -1,25 +1,23 @@
-#include<stdio.h>
+#include <stdio.h>
 #include <string.h> 
 #include <stdlib.h>
 #include <regex.h>
 
-#define SEND_BUF_SIZE 1100
+#define BUF_SIZE 1100
 #define DATA_SIZE 1000
-
 
 typedef struct tagPacket {
 	unsigned int total_frag;
 	unsigned int frag_no;
 	unsigned int size;
 	char *filename;
-	char filedata[1000]; 
+	char filedata[DATA_SIZE]; 
 } Packet;
-
 
 void packetToString(const Packet *packet, char *result) {
     
     // Initialize string buffer
-    memset(result, 0, SEND_BUF_SIZE);
+    memset(result, 0, BUF_SIZE);
 
     // Load data into string
     int cursor = 0;
@@ -61,20 +59,19 @@ void stringToPacket(const char* str, Packet *packet) {
         fprintf(stderr, "Could not compile regex\n");
     }
 
-
     // Match regex to find ":" 
     regmatch_t pmatch[1];
     int cursor = 0;
-    char tmp[50];
+    char buf[BUF_SIZE];
 
     // Match total_frag
     if(regexec(&regex, str + cursor, 1, pmatch, REG_NOTBOL)) {
         fprintf(stderr, "Error matching regex\n");
         exit(1);
     }
-    memset(tmp, 0, 50 * sizeof(char));
-    memcpy(tmp, str + cursor, pmatch[0].rm_so);
-    packet -> total_frag = atoi(tmp);
+    memset(buf, 0, BUF_SIZE * sizeof(char));
+    memcpy(buf, str + cursor, pmatch[0].rm_so);
+    packet -> total_frag = atoi(buf);
     cursor += (pmatch[0].rm_so + 1);
 
     // Match frag_no
@@ -82,9 +79,9 @@ void stringToPacket(const char* str, Packet *packet) {
         fprintf(stderr, "Error matching regex\n");
         exit(1);
     }
-    memset(tmp, 0, 50 * sizeof(char));
-    memcpy(tmp, str + cursor, pmatch[0].rm_so);
-    packet -> frag_no = atoi(tmp);
+    memset(buf, 0,  BUF_SIZE * sizeof(char));
+    memcpy(buf, str + cursor, pmatch[0].rm_so);
+    packet -> frag_no = atoi(buf);
     cursor += (pmatch[0].rm_so + 1);
 
     // Match size
@@ -92,9 +89,9 @@ void stringToPacket(const char* str, Packet *packet) {
         fprintf(stderr, "Error matching regex\n");
         exit(1);
     }
-    memset(tmp, 0, 50 * sizeof(char));
-    memcpy(tmp, str + cursor, pmatch[0].rm_so);
-    packet -> size = atoi(tmp);
+    memset(buf, 0, BUF_SIZE * sizeof(char));
+    memcpy(buf, str + cursor, pmatch[0].rm_so);
+    packet -> size = atoi(buf);
     cursor += (pmatch[0].rm_so + 1);
 
     // Match filename
@@ -103,8 +100,8 @@ void stringToPacket(const char* str, Packet *packet) {
         exit(1);
     }
     // memcpy(packet -> filename, str + cursor, pmatch[0].rm_so);
-    memcpy(tmp, str + cursor, pmatch[0].rm_so);
-    packet -> filename = tmp;
+    memcpy(buf, str + cursor, pmatch[0].rm_so);
+    packet -> filename = buf;
     cursor += (pmatch[0].rm_so + 1);
 
     // Match filedata
