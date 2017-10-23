@@ -73,7 +73,7 @@ void send_file(char *filename, int sockfd, struct sockaddr_in serv_addr) {
     // Send packets and receive acknowledgements
     struct timeval timeout;
     timeout.tv_sec = 0;
-    timeout.tv_usec = 1000;
+    timeout.tv_usec = 10000;
     if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
         fprintf(stderr, "setsockopt failed\n");
     }
@@ -117,12 +117,12 @@ void send_file(char *filename, int sockfd, struct sockaddr_in serv_addr) {
         end = clock();
 
         // Update congestion control
-        sampleRTT = 1000 * ((double)(end - start) / CLOCKS_PER_SEC);
+        sampleRTT = 1000000 * ((double)(end - start) / CLOCKS_PER_SEC);
         estimatedRTT = 0.875 * estimatedRTT + (sampleRTT >> 3);
         dev = (estimatedRTT - sampleRTT) > 0 ? (estimatedRTT - sampleRTT) : (sampleRTT - estimatedRTT);
         devRTT = 0.75 * devRTT + (dev >> 2);
         timeout.tv_usec = estimatedRTT + (devRTT << 2);
-        printf("Timeout updated to:\t%d usec\n", timeout.tv_usec);
+        printf("Packet #%d: Timeout updated to:\t%d usec\n", packet_num, timeout.tv_usec);
         
         stringToPacket(rec_buf, &ack_packet);
         
