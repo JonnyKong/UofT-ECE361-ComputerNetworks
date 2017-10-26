@@ -18,7 +18,7 @@
 
 // Convert packet to string
 
-void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr_in serv_addr) {
+void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv_addr) {
 
     // Open file
     FILE *fp;
@@ -97,14 +97,14 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr_in s
         // Send packets
         // printf("Sending packet #%d / %d...\n", packet_num, total_frag);
         start = clock();
-        if((numbytes = sendto(sockfd, packets[packet_num - 1], BUF_SIZE, 0 , (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1) {
+        if((numbytes = sendto(sockfd, packets[packet_num - 1], BUF_SIZE, 0 , &serv_addr, sizeof(serv_addr))) == -1) {
             fprintf(stderr, "sendto error for packet #%d\n", packet_num);
             exit(1);
         }
 
         // Receive acknowledgements
         memset(rec_buf, 0, sizeof(char) * BUF_SIZE);
-        if((numbytes = recvfrom(sockfd, rec_buf, BUF_SIZE, 0, (struct sockaddr *) &serv_addr, &serv_addr_size)) == -1) {
+        if((numbytes = recvfrom(sockfd, rec_buf, BUF_SIZE, 0, &serv_addr, &serv_addr_size)) == -1) {
             // Resend if timeout
             fprintf(stderr, "Timeout or recvfrom error for ACK packet #%d, resending attempt #%d...\n", packet_num--, timesent);
             if(timesent < ALIVE){
@@ -186,22 +186,7 @@ int main(int argc, char const *argv[])
         fprintf(stderr, "socket error\n");
         exit(1);
     }
-	
-	char ipstr[INET6_ADDRSTRLEN];
-	struct in_addr *addr;
-	struct sockaddr_in *ipv4 = (struct sockaddr_in *)servinfo->ai_addr;
-	addr = &(ipv4->sin_addr);
-	// convert the IP to a string and print it:
-	inet_ntop(servinfo->ai_family, addr, ipstr, sizeof ipstr);
-
-    struct sockaddr_in serv_addr;
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(port);
-	serv_addr.sin_addr = *addr;
-    /*if (inet_aton(ipstr, &(serv_addr.sin_addr)) == 0) {
-        fprintf(stderr, "inet_aton error\n");
-        exit(1);
-    }*/
+	struct sockaddr serv_addr = *(servinfo->ai_addr);
 
     char buf[BUF_SIZE] = {0};
     char filename[BUF_SIZE] = {0};
@@ -234,14 +219,14 @@ int main(int argc, char const *argv[])
     // send the message
     clock_t start, end;  // timer variables
     start = clock();
-    if ((numbytes = sendto(sockfd, "ftp", strlen("ftp") , 0 , (struct sockaddr *) &serv_addr, sizeof(serv_addr))) == -1) {
+    if ((numbytes = sendto(sockfd, "ftp", strlen("ftp") , 0 , &serv_addr, sizeof(serv_addr))) == -1) {
         fprintf(stderr, "sendto error\n");
         exit(1);
     }
     
     memset(buf, 0, BUF_SIZE); // clean the buffer
     socklen_t serv_addr_size = sizeof(serv_addr);
-    if((numbytes = recvfrom(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *) &serv_addr, &serv_addr_size)) == -1) {
+    if((numbytes = recvfrom(sockfd, buf, BUF_SIZE, 0, &serv_addr, &serv_addr_size)) == -1) {
         fprintf(stderr, "recvfrom error\n");
         exit(1);
     }
