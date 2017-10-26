@@ -119,7 +119,6 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr_in s
 
         // Update congestion control
         sampleRTT = end - start;
-		printf("SampleRTT: %d\t", sampleRTT);
         estimatedRTT = 0.875 * estimatedRTT + (sampleRTT >> 3);
         dev = (estimatedRTT - sampleRTT) > 0 ? (estimatedRTT - sampleRTT) : (sampleRTT - estimatedRTT);
         devRTT = 0.75 * devRTT + (dev >> 2);
@@ -227,7 +226,7 @@ int main(int argc, char const *argv[])
     end = clock();
 
 	clock_t initRTT = end - start;
-    fprintf(stdout, "RTT = %d usec\n", initRTT);  
+    fprintf(stdout, "RTT = %lu usec\n", initRTT);  
 
     if(strcmp(buf, "yes") == 0) {
         fprintf(stdout, "A file transfer can start\n");
