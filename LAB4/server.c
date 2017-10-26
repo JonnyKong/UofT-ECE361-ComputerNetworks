@@ -89,13 +89,13 @@ int main(int argc, char const *argv[])
 				fragRecv[i] = false;
 			}
 		}
-		if (!fragRecv[packet.frag_no]) {	
+		if (!fragRecv[packet.frag_no - 1]) {	
 			int numbyte = fwrite(packet.filedata, sizeof(char), packet.size, pFile);
 			if (numbyte != packet.size) {
 				printf("fwrite error\n");
 				exit(1);
 			} 
-			fragRecv[packet.frag_no] = true;
+			fragRecv[packet.frag_no - 1] = true;
 		}
 		strcpy(packet.filedata, "ACK");
 		
@@ -106,11 +106,41 @@ int main(int argc, char const *argv[])
 		}
 		
 		if (packet.frag_no == packet.total_frag) {
-			printf("File %s transfer completed\n", filename);
-			break;
+			bool finished = true;
+			for (int p = 0; p < packet.total_frag; p++) {
+				finished &= fragRecv[p];			
+			}
+			if (finished) break;
 		}
 	}
-
+	
+	// wait for FIN message
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 999999;
+    if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+        fprintf(stderr, "setsockopt failed\n");
+    }
+	
+	for (;;) {
+		if (recvfrom(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *) &cli_addr, &clilen) == -1) {
+			printf("timeout or recv error when waiting for FIN message\nForce quit\n");
+			break;
+		}		
+		stringToPacket(buf, &packet);	
+		if (strcmp(packet.filedata, "FIN") == 0) { 
+			printf("File %s transfer completed\n", filename);
+			break;
+		} else {
+			strcpy(packet.filedata, "ACK");
+			packetToString(&packet, buf);
+			if ((sendto(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *) &cli_addr, sizeof(cli_addr))) == -1) {
+				printf("sendto error\n");
+				exit(1);
+			}
+		} 
+	}
+	
 	close(sockfd);
 	fclose(pFile);
 	free(fragRecv);
