@@ -135,9 +135,10 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv
 	    	fprintf(stderr, "setsockopt failed\n");
 		}
 		if (!istimeout) {
-			fprintf(stderr, "Packet #%d timeout, timeout reset to:\t%d usec\n", packet_num, timeout.tv_usec);
 			packet_num++;
 			timesent = 0;
+		} else {
+			fprintf(stderr, "Packet #%d timeout, timeout reset to:\t%d usec\n", packet_num, timeout.tv_usec);		
 		}
 	}
 
