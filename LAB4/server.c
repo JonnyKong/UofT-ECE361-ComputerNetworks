@@ -37,7 +37,7 @@ int main(int argc, char const *argv[])
 	
 	char buf[BUF_SIZE] = {0};
 	struct sockaddr_in cli_addr; 
-	socklen_t clilen; // length of client info
+	socklen_t clilen = sizeof(cli_addr); // length of client info
 	// recvfrom the client and store info in cli_addr so as to send back later
 	if (recvfrom(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *) &cli_addr, &clilen) == -1) {
 		printf("recvfrom error\n");
@@ -56,7 +56,6 @@ int main(int argc, char const *argv[])
 			exit(1);
 		}
 	}
-
 	Packet packet;
 	packet.filename = (char *) malloc(BUF_SIZE);
 	char filename[BUF_SIZE] = {0};
@@ -66,17 +65,21 @@ int main(int argc, char const *argv[])
 		if (recvfrom(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *) &cli_addr, &clilen) == -1) {
 			printf("recvfrom error\n");
 			exit(1);
-		}
+		}		
 		stringToPacket(buf, &packet);
 		if (!pFile) {
-			strcpy(filename, packet.filename);		
+			strcpy(filename, packet.filename);	
 			while (access(filename, F_OK) == 0) {
 				char *pSuffix = strrchr(filename, '.');
-				char suffix[BUF_SIZE + 1] = {0};
-				strncpy(suffix, pSuffix, BUF_SIZE - 1);
-				*pSuffix = '\0';
-				strcat(filename, " copy");
-				strcat(filename, suffix);
+				if (pSuffix != NULL) {
+					char suffix[BUF_SIZE + 1] = {0};
+					strncpy(suffix, pSuffix, BUF_SIZE - 1);
+					*pSuffix = '\0';
+					strcat(filename, " copy");
+					strcat(filename, suffix);
+				} else {
+					strcat(filename, " copy");	
+				}
 			} 
 			pFile = fopen(filename, "w");
 		}
@@ -95,12 +98,13 @@ int main(int argc, char const *argv[])
 			fragRecv[packet.frag_no] = true;
 		}
 		strcpy(packet.filedata, "ACK");
-
+		
 		packetToString(&packet, buf);
 		if ((sendto(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *) &cli_addr, sizeof(cli_addr))) == -1) {
 			printf("sendto error\n");
 			exit(1);
 		}
+		
 		if (packet.frag_no == packet.total_frag) {
 			printf("File %s transfer completed\n", filename);
 			break;
