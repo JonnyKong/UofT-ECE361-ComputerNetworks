@@ -124,6 +124,9 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv
         dev = (estimatedRTT - sampleRTT) > 0 ? (estimatedRTT - sampleRTT) : (sampleRTT - estimatedRTT);
         devRTT = 0.75 * devRTT + (dev >> 2);
         timeout.tv_usec = estimatedRTT + (devRTT << 2);
+		if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+        	fprintf(stderr, "setsockopt failed\n");
+    	}
         printf("Packet #%d: Timeout updated to:\t%d usec\n", packet_num, timeout.tv_usec);
         
         stringToPacket(rec_buf, &ack_packet);
@@ -142,7 +145,7 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv
         // Resend packet
         fprintf(stderr, "ACK packet #%d not received, resending attempt #%d...\n", packet_num, timesent);
         --packet_num;
-
+		estimatedRTT *= 2;
     }
     
 
@@ -254,4 +257,3 @@ int main(int argc, char const *argv[])
     
     return 0;
 }
-
