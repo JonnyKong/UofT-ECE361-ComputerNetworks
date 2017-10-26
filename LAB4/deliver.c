@@ -73,8 +73,8 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv
 
     // Send packets and receive acknowledgements
     struct timeval timeout;
-    timeout.tv_sec = 1;
-    timeout.tv_usec = 0;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 1000000;
     if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
         fprintf(stderr, "setsockopt failed\n");
     }
