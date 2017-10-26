@@ -131,6 +131,7 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv
 	    dev = (estimatedRTT - sampleRTT) > 0 ? (estimatedRTT - sampleRTT) : (sampleRTT - estimatedRTT);
 	    devRTT = 0.75 * devRTT + (dev >> 2);
 	    timeout.tv_usec = estimatedRTT + (devRTT << 2);
+		printf("sampleRTT = %d\testimatedRTT = %d\tdev = %d\tdevRTT = %d\n", sampleRTT, estimatedRTT, dev, devRTT);
 		if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
 	    	fprintf(stderr, "setsockopt failed\n");
 		}
