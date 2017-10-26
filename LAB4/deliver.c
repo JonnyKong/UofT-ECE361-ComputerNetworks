@@ -85,7 +85,8 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr_in s
 
     // Setup congestion control
     clock_t estimatedRTT = timeout.tv_usec;
-    clock_t sampleRTT, devRTT, dev;
+	clock_t devRTT = initRTT;
+    clock_t sampleRTT, dev;
     clock_t start, end;
 
     for(int packet_num = 1; packet_num <= total_frag; ++packet_num) {
@@ -118,6 +119,7 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr_in s
 
         // Update congestion control
         sampleRTT = end - start;
+		printf("SampleRTT: %d\t", sampleRTT);
         estimatedRTT = 0.875 * estimatedRTT + (sampleRTT >> 3);
         dev = (estimatedRTT - sampleRTT) > 0 ? (estimatedRTT - sampleRTT) : (sampleRTT - estimatedRTT);
         devRTT = 0.75 * devRTT + (dev >> 2);
@@ -244,3 +246,4 @@ int main(int argc, char const *argv[])
     
     return 0;
 }
+
