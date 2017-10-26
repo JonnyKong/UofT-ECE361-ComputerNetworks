@@ -74,7 +74,7 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv
     // Send packets and receive acknowledgements
     struct timeval timeout;
     timeout.tv_sec = 0;
-    timeout.tv_usec = 1000000;
+    timeout.tv_usec = 999999;
     if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
         fprintf(stderr, "setsockopt failed\n");
     }
@@ -127,11 +127,12 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv
 		end = clock();
 		// Update congestion control
 	    sampleRTT = end - start;
-	    estimatedRTT = 0.875 * estimatedRTT + (sampleRTT >> 3);
-	    dev = (estimatedRTT - sampleRTT) > 0 ? (estimatedRTT - sampleRTT) : (sampleRTT - estimatedRTT);
-	    devRTT = 0.75 * devRTT + (dev >> 2);
-	    timeout.tv_usec = estimatedRTT + (devRTT << 2);
-		printf("sampleRTT = %d\testimatedRTT = %d\tdev = %d\tdevRTT = %d\n", sampleRTT, estimatedRTT, dev, devRTT);
+	    estimatedRTT = 0.875 * ((double) estimatedRTT) + (sampleRTT >> 3);
+	    dev = (estimatedRTT > sampleRTT) ? (estimatedRTT - sampleRTT) : (sampleRTT - estimatedRTT);
+	    devRTT = 0.75 * ((double) devRTT) + (dev >> 2);
+        timeout.tv_usec = 20 * estimatedRTT + (devRTT << 2);
+        /*printf("sampleRTT = %d\testimatedRTT = %d\tdev = %d\tdevRTT = %d\ttv_usec = %d\n", 
+                sampleRTT, estimatedRTT, dev, devRTT, timeout.tv_usec);*/
 		if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
 	    	fprintf(stderr, "setsockopt failed\n");
 		}
@@ -152,8 +153,6 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv
     free(ack_packet.filename);
 
 }
-
-
 
 int main(int argc, char const *argv[])
 {
@@ -247,7 +246,7 @@ int main(int argc, char const *argv[])
     // Sending Completed
     close(sockfd);
 	freeaddrinfo(servinfo);
-    printf("File Transfer Completed, SocketClosed.\n");
+    printf("File Transfer Completed, Socket Closed.\n");
     
     return 0;
 }
