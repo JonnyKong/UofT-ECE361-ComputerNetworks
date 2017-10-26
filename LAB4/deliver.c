@@ -20,7 +20,6 @@
 // Convert packet to string
 
 void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv_addr) {
-
     // Open file
     FILE *fp;
     if((fp = fopen(filename, "r")) == NULL) {
@@ -143,6 +142,18 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv
 			fprintf(stderr, "Packet #%d timeout, timeout reset to:\t%d usec\n", packet_num, timeout.tv_usec);		
 		}
 	}
+	// send FIN message
+	Packet fin;
+	fin.total_frag = total_frag;
+	fin.frag_no = 0;
+	fin.size = DATA_SIZE;
+	fin.filename = filename;
+	strcpy(fin.filedata, "FIN");
+	packetToString(&fin, rec_buf);
+	if((numbytes = sendto(sockfd, rec_buf, BUF_SIZE, 0, &serv_addr, sizeof(serv_addr))) == -1) {
+        fprintf(stderr, "sendto error for FIN message\n");
+        exit(1);
+    }
 
     // Free memory
     for(int packet_num = 1; packet_num <= total_frag; ++packet_num) {
@@ -242,7 +253,7 @@ int main(int argc, char const *argv[])
 
     // Begin sending file and check for acknowledgements
     send_file(initRTT, filename, sockfd, serv_addr);
-    
+
     // Sending Completed
     close(sockfd);
 	freeaddrinfo(servinfo);
