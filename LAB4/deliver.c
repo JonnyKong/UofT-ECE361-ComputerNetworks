@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #include "packet.h"
 
@@ -77,10 +78,9 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv
     if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
         fprintf(stderr, "setsockopt failed\n");
     }
-    int timesent = 0;   // Number of times a packet is sent
     socklen_t serv_addr_size = sizeof(serv_addr);
 
-    Packet ack_packet;  // Packet receiveds
+    Packet ack_packet;  // Packet received
     ack_packet.filename = (char *)malloc(BUF_SIZE * sizeof(char));
 
     // Setup congestion control
@@ -88,66 +88,58 @@ void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr serv
 	clock_t devRTT = initRTT;
     clock_t sampleRTT, dev;
     clock_t start, end;
-
-    for(int packet_num = 1; packet_num <= total_frag; ++packet_num) {
-
-        int numbytes;       // Return value of sendto and recvfrom
-        ++timesent;
-
-        // Send packets
-        // printf("Sending packet #%d / %d...\n", packet_num, total_frag);
-        start = clock();
-        if((numbytes = sendto(sockfd, packets[packet_num - 1], BUF_SIZE, 0 , &serv_addr, sizeof(serv_addr))) == -1) {
+	
+	int timesent = 0;   // Number of times a packet is sent
+	int numbytes;
+	int packet_num = 1;
+	bool istimeout;
+	while (packet_num <= total_frag) {
+		istimeout = false;
+		memset(rec_buf, 0, sizeof(char) * BUF_SIZE);
+		start = clock();
+		if((numbytes = sendto(sockfd, packets[packet_num - 1], BUF_SIZE, 0 , &serv_addr, sizeof(serv_addr))) == -1) {
             fprintf(stderr, "sendto error for packet #%d\n", packet_num);
             exit(1);
         }
-
-        // Receive acknowledgements
-        memset(rec_buf, 0, sizeof(char) * BUF_SIZE);
-        if((numbytes = recvfrom(sockfd, rec_buf, BUF_SIZE, 0, &serv_addr, &serv_addr_size)) == -1) {
-            // Resend if timeout
-            fprintf(stderr, "Timeout or recvfrom error for ACK packet #%d, resending attempt #%d...\n", packet_num--, timesent);
-            if(timesent < ALIVE){
-                continue;
-            }
-            else {
-                fprintf(stderr, "Too many resends. File transfer terminated.\n");
-                exit(1);
-            }
-        }
-        end = clock();
-
-        // Update congestion control
-        sampleRTT = end - start;
-		
-        estimatedRTT = 0.875 * estimatedRTT + (sampleRTT >> 3);
-        dev = (estimatedRTT - sampleRTT) > 0 ? (estimatedRTT - sampleRTT) : (sampleRTT - estimatedRTT);
-        devRTT = 0.75 * devRTT + (dev >> 2);
-        timeout.tv_usec = estimatedRTT + (devRTT << 2);
+		for (;;) {
+			// Receive acknowledgements
+			if((numbytes = recvfrom(sockfd, rec_buf, BUF_SIZE, 0, &serv_addr, &serv_addr_size)) == -1) {
+				timesent++;
+				// Resend if timeout
+		        fprintf(stderr, "Timeout or recvfrom error for ACK packet #%d, resending attempt #%d...\n", packet_num, timesent);
+		        if(timesent <= ALIVE){
+					istimeout = true;
+					break;
+		        } else {
+		            fprintf(stderr, "Too many resends. File transfer terminated.\n");
+		            exit(1);
+		        }
+		    }
+			stringToPacket(rec_buf, &ack_packet);
+			// Check contents of ACK packets
+		    if(ack_packet.frag_no != packet_num) {
+				printf("Not current ACK. Drop and wait for the next ACK.\n");
+		    	continue;
+		    } else {
+				break;			
+			}
+		}
+		end = clock();
+		// Update congestion control
+	    sampleRTT = end - start;
+	    estimatedRTT = 0.875 * estimatedRTT + (sampleRTT >> 3);
+	    dev = (estimatedRTT - sampleRTT) > 0 ? (estimatedRTT - sampleRTT) : (sampleRTT - estimatedRTT);
+	    devRTT = 0.75 * devRTT + (dev >> 2);
+	    timeout.tv_usec = estimatedRTT + (devRTT << 2);
 		if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
-        	fprintf(stderr, "setsockopt failed\n");
-    	}
-        printf("Packet #%d: Timeout updated to:\t%d usec\n", packet_num, timeout.tv_usec);
-        
-        stringToPacket(rec_buf, &ack_packet);
-        
-        // Check contents of ACK packets
-        if(strcmp(ack_packet.filename, filename) == 0) {
-            if(ack_packet.frag_no == packet_num) {
-                if(strcmp(ack_packet.filedata, "ACK") == 0) {
-                    // printf("ACK packet #%d received\n", packet_num);
-                    timesent = 0;
-                    continue;
-                }
-            }
-        }
-
-        // Resend packet
-        fprintf(stderr, "ACK packet #%d not received, resending attempt #%d...\n", packet_num, timesent);
-        --packet_num;
-		estimatedRTT *= 2;
-    }
-    
+	    	fprintf(stderr, "setsockopt failed\n");
+		}
+		if (!istimeout) {
+			fprintf(stderr, "Packet #%d timeout, timeout reset to:\t%d usec\n", packet_num, timeout.tv_usec);
+			packet_num++;
+			timesent = 0;
+		}
+	}
 
     // Free memory
     for(int packet_num = 1; packet_num <= total_frag; ++packet_num) {
