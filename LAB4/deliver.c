@@ -18,7 +18,7 @@
 
 // Convert packet to string
 
-void send_file(char *filename, int sockfd, struct sockaddr_in serv_addr) {
+void send_file(clock_t initRTT, char *filename, int sockfd, struct sockaddr_in serv_addr) {
 
     // Open file
     FILE *fp;
@@ -73,7 +73,7 @@ void send_file(char *filename, int sockfd, struct sockaddr_in serv_addr) {
     // Send packets and receive acknowledgements
     struct timeval timeout;
     timeout.tv_sec = 0;
-    timeout.tv_usec = 10000;
+    timeout.tv_usec = initRTT;
     if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
         fprintf(stderr, "setsockopt failed\n");
     }
@@ -84,8 +84,8 @@ void send_file(char *filename, int sockfd, struct sockaddr_in serv_addr) {
     ack_packet.filename = (char *)malloc(BUF_SIZE * sizeof(char));
 
     // Setup congestion control
-    int estimatedRTT = timeout.tv_usec;
-    int sampleRTT, devRTT, dev;
+    clock_t estimatedRTT = timeout.tv_usec;
+    clock_t sampleRTT, devRTT, dev;
     clock_t start, end;
 
     for(int packet_num = 1; packet_num <= total_frag; ++packet_num) {
@@ -117,7 +117,7 @@ void send_file(char *filename, int sockfd, struct sockaddr_in serv_addr) {
         end = clock();
 
         // Update congestion control
-        sampleRTT = 1000000 * ((double)(end - start) / CLOCKS_PER_SEC);
+        sampleRTT = end - start;
         estimatedRTT = 0.875 * estimatedRTT + (sampleRTT >> 3);
         dev = (estimatedRTT - sampleRTT) > 0 ? (estimatedRTT - sampleRTT) : (sampleRTT - estimatedRTT);
         devRTT = 0.75 * devRTT + (dev >> 2);
@@ -223,7 +223,9 @@ int main(int argc, char const *argv[])
         exit(1);
     }
     end = clock();
-    fprintf(stdout, "RTT = %f sec.\n", ((double) (end - start) / CLOCKS_PER_SEC));  
+
+	clock_t initRTT = end - start;
+    fprintf(stdout, "RTT = %d usec\n", initRTT);  
 
     if(strcmp(buf, "yes") == 0) {
         fprintf(stdout, "A file transfer can start\n");
@@ -234,7 +236,7 @@ int main(int argc, char const *argv[])
 
 
     // Begin sending file and check for acknowledgements
-    send_file(filename, sockfd, serv_addr);
+    send_file(initRTT, filename, sockfd, serv_addr);
     
     // Sending Completed
     close(sockfd);
