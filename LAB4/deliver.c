@@ -164,23 +164,53 @@ int main(int argc, char const *argv[])
         exit(0);
     }
     int port = atoi(argv[2]);
+
+	struct addrinfo hints;
+	memset(&hints, 0 , sizeof(hints)); // make sure that the structs are empty
+	hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = 0;
+	hints.ai_flags = AI_ADDRCONFIG;
+
+	struct addrinfo *servinfo = NULL;  // will point to the results
+	int status;
+	// get ready to connect
+    if ((status = getaddrinfo(argv[1], argv[2], &hints, &servinfo)) != 0) {
+        fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
+        exit(1);
+    }
  
     int sockfd;
     // open socket (DGRAM)
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+    if ((sockfd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol)) == -1) {
         fprintf(stderr, "socket error\n");
         exit(1);
     }
-    
+	
+	char ipstr[INET6_ADDRSTRLEN];
+	void *addr;
+	char *ipver;
+	if (servinfo->ai_family == AF_INET) { // IPv4
+		struct sockaddr_in *ipv4 = (struct sockaddr_in *)servinfo->ai_addr;
+		addr = &(ipv4->sin_addr);
+		ipver = "IPv4";
+	} else { // IPv6
+		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)servinfo->ai_addr;
+		addr = &(ipv6->sin6_addr);
+		ipver = "IPv6";
+	}
+	// convert the IP to a string and print it:
+	inet_ntop(servinfo->ai_family, addr, ipstr, sizeof ipstr);
+
     struct sockaddr_in serv_addr;
-    memset((char *) &serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
-    if (inet_aton(argv[1] , &serv_addr.sin_addr) == 0) {
+	
+    if (inet_aton(ipstr, &(serv_addr.sin_addr)) == 0) {
         fprintf(stderr, "inet_aton error\n");
         exit(1);
     }
- 
+
     char buf[BUF_SIZE] = {0};
     char filename[BUF_SIZE] = {0};
 
@@ -241,6 +271,7 @@ int main(int argc, char const *argv[])
     
     // Sending Completed
     close(sockfd);
+	freeaddrinfo(servinfo);
     printf("File Transfer Completed, SocketClosed.\n");
     
     return 0;
