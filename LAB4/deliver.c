@@ -188,28 +188,20 @@ int main(int argc, char const *argv[])
     }
 	
 	char ipstr[INET6_ADDRSTRLEN];
-	void *addr;
-	char *ipver;
-	if (servinfo->ai_family == AF_INET) { // IPv4
-		struct sockaddr_in *ipv4 = (struct sockaddr_in *)servinfo->ai_addr;
-		addr = &(ipv4->sin_addr);
-		ipver = "IPv4";
-	} else { // IPv6
-		struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)servinfo->ai_addr;
-		addr = &(ipv6->sin6_addr);
-		ipver = "IPv6";
-	}
+	struct in_addr *addr;
+	struct sockaddr_in *ipv4 = (struct sockaddr_in *)servinfo->ai_addr;
+	addr = &(ipv4->sin_addr);
 	// convert the IP to a string and print it:
 	inet_ntop(servinfo->ai_family, addr, ipstr, sizeof ipstr);
 
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
-	
-    if (inet_aton(ipstr, &(serv_addr.sin_addr)) == 0) {
+	serv_addr.sin_addr = *addr;
+    /*if (inet_aton(ipstr, &(serv_addr.sin_addr)) == 0) {
         fprintf(stderr, "inet_aton error\n");
         exit(1);
-    }
+    }*/
 
     char buf[BUF_SIZE] = {0};
     char filename[BUF_SIZE] = {0};
