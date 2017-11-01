@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <arpa/inet.h>
+#include <pthread.h>
 
 #include "packet.h"
 #include "user.h"
@@ -15,10 +17,23 @@
 #define BACKLOG 10	    // how many pending connections queue will hold
 
 User *userList;         // List of all users and passwords
-User *userConnected;    // List of users connected (up to date)
+User *userConnected;    // List of users connected (with/without logged in)
+User *userLoggedin;		// List of users logged in
 
 char inBuf[INBUF_SIZE] = {0};  // Input buffer
 char port[6] = {0}; // Store port in string for getaddrinfo
+
+
+// get sockaddr, IPv4 or IPv6:
+void *get_in_addr(struct sockaddr *sa)
+{
+	if (sa->sa_family == AF_INET) {
+		return &(((struct sockaddr_in*)sa)->sin_addr);
+	}
+
+	return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
 
 int main() {
     // Get user input
@@ -97,6 +112,24 @@ int main() {
 	printf("Server: waiting for connections...\n");
 
     
+	// main accept() loop
+	while(1) {
+
+		// Accept new incoming connections
+		sin_size = sizeof(their_addr);
+		new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+		if (new_fd == -1) {
+			perror("accept");
+			continue;
+		}
+		inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof(s));
+		printf("server: got connection from %s\n", s);
+
+		// Create new thread to handle the new socket
+		// Update information of this user
+		User *newUsr = malloc(1, sizeof(User));
+		
+	}
 
 
 

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #define UNAMELEN 32
 #define PWDLEN 32
@@ -8,16 +9,18 @@
 
 typedef struct _User {
     // Username and passwords
-    char uname[UNAMELEN];
-    char pwd[PWDLEN];
+    char uname[UNAMELEN];   // Valid if logged in
+    char pwd[PWDLEN];       // Valid if logged in
 
-    // Client status (if valid)
-    int session_id;
-    char IP[IPLEN];
-    int port;
+    // Client status
+    int session_id;     // Valid if joined a session
+    char IP[IPLEN];     // Valid if connected
+    int port;           // Valid if connected
+    pthread_t p;        // Valid if connected
 
     // Linked list support
     struct _User *next;     
+
 } User;
 
 
@@ -50,4 +53,17 @@ void destroy_userlist(User *root) {
         current = next;
     }
     // printf("List Destroyed\n");
+}
+
+
+// Check if usr is a valid user
+bool is_valid_user(const User *userList, const User *usr) {
+    User *current = userList;
+    while(current != NULL) {
+        if(strcmp(current -> uname, usr -> uname) == 0 && strcmp(current -> pwd, usr -> pwd) == 0) {
+            return 1;    
+        }
+        current = current -> next;
+    }
+    return 0;
 }
