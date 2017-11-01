@@ -5,7 +5,7 @@
 
 #define ULISTFILE "userlist.txt"
 
-User *userList;     // All users and passwords
+User *userList;     // List of all users and passwords
 
 int main() {
 
