@@ -29,7 +29,6 @@ void *get_in_addr(struct sockaddr *sa) {
 	if (sa->sa_family == AF_INET) {
 		return &(((struct sockaddr_in*)sa)->sin_addr);
 	}
-
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
@@ -125,7 +124,7 @@ int main() {
 		printf("server: got connection from %s\n", s);
 
 		// Create new thread to handle the new socket
-		// Update information of this user
+		// Put user in connected list
 		User *newUsr = malloc(1, sizeof(User));
 		
 	}

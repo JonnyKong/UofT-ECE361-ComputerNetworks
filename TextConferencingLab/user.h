@@ -36,8 +36,9 @@ User *init_userlist(FILE *fp) {
             free(usr);
             break;
         }
-        usr -> next = root;
-        root = usr;        
+        // usr -> next = root;
+        // root = usr;        
+        root = add_user(root, usr);
     }
     return root;
 }
@@ -55,8 +56,14 @@ void destroy_userlist(User *root) {
     // printf("List Destroyed\n");
 }
 
+// Add user to a list
+User *add_user(User* userList, User *newUsr) {
+    newUsr -> next = userList;
+    return newUsr;
+}
 
-// Check if usr is a valid user
+
+// Check if usr is in list (valid, connected, logged in, etc)
 bool is_valid_user(const User *userList, const User *usr) {
     User *current = userList;
     while(current != NULL) {
