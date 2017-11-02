@@ -123,10 +123,14 @@ int main() {
 		inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof(s));
 		printf("server: got connection from %s\n", s);
 
-		// Create new thread to handle the new socket
-		// Put user in connected list
+		// Update user info, and add user in connected list
 		User *newUsr = malloc(1, sizeof(User));
-		
+		// TODO: add IP, port to newUsr
+		userConnected = add_user(userConnected, newUsr);
+
+		// Create new thread to handle the new socket
+		pthread_create(&(newUsr -> p), )
+
 	}
 
 
