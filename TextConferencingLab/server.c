@@ -18,7 +18,6 @@
 #define BACKLOG 10	    // how many pending connections queue will hold
 
 User *userList;         // List of all users and passwords
-User *userConnected;    // List of users connected (with/without logged in)
 User *userLoggedin;		// List of users logged in
 
 char inBuf[INBUF_SIZE] = {0};  // Input buffer
