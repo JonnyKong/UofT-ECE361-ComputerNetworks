@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 #define UNAMELEN 32
 #define PWDLEN 32
@@ -22,6 +23,12 @@ typedef struct _User {
     struct _User *next;     
 
 } User;
+
+// Add user to a list
+User *add_user(User* userList, User *newUsr) {
+    newUsr -> next = userList;
+    return newUsr;
+}
 
 
 // Read user database from file
@@ -56,16 +63,9 @@ void destroy_userlist(User *root) {
     // printf("List Destroyed\n");
 }
 
-// Add user to a list
-User *add_user(User* userList, User *newUsr) {
-    newUsr -> next = userList;
-    return newUsr;
-}
-
-
 // Check if usr is in list (valid, connected, logged in, etc)
 bool is_valid_user(const User *userList, const User *usr) {
-    User *current = userList;
+    const User *current = userList;
     while(current != NULL) {
         if(strcmp(current -> uname, usr -> uname) == 0 && strcmp(current -> pwd, usr -> pwd) == 0) {
             return 1;    
