@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -31,6 +32,9 @@ void *get_in_addr(struct sockaddr *sa) {
 	}
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
+
+
+// Subroutine to handle
 
 
 int main() {
@@ -124,12 +128,12 @@ int main() {
 		printf("server: got connection from %s\n", s);
 
 		// Update user info, and add user in connected list
-		User *newUsr = malloc(1, sizeof(User));
+		User *newUsr = malloc(sizeof(User));
 		// TODO: add IP, port to newUsr
 		userConnected = add_user(userConnected, newUsr);
 
 		// Create new thread to handle the new socket
-		pthread_create(&(newUsr -> p), )
+		// pthread_create(&(newUsr -> p), );
 
 	}
 
