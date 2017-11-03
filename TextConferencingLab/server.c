@@ -69,6 +69,7 @@ void *new_client(void *arg) {
 		Packet pktSend;		// Packet to send
 		bool toSend = 0;	// Whether to send pktSend after this loop
 		printf("Message received: \"%s\"\n", buffer);
+
 		stringToPacket(buffer, &pktRecv);
 		memset(&pktSend, 0, sizeof(Packet));
 
@@ -418,8 +419,10 @@ int main() {
 		pthread_create(&(newUsr -> p), NULL, new_client, (void *)newUsr);
 
 		// Temp: server quites as last user leaves session
-		if(userConnectedCnt == 0) break;
-		printf("All user have left session, server terminating...\n");
+		if(userConnectedCnt == 0) {
+			printf("All user have left session, server terminating...\n");
+			break;
+		}
 	}
 
 
