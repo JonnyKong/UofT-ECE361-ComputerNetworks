@@ -29,8 +29,8 @@ User *add_user(User* userList, User *newUsr) {
 }
 
 // Remove user from a list based on username
-User *remove_user(User *userList, User *usr) {
-    if(userList == NULL) return;
+User *remove_user(User *userList, User const *usr) {
+    if(userList == NULL) return NULL;
 
     // First in list
     else if(strcmp(userList -> uname, usr -> uname) == 0) {

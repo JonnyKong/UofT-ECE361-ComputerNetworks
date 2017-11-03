@@ -1,5 +1,5 @@
 TARGET = server client
-DEPS = packet.h user.h
+DEPS = packet.h user.h session.h
 CFLAGS = -lpthread
 
 all:  ${TARGET}

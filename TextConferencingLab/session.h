@@ -54,55 +54,65 @@ Session *init_session(Session *sessionList, int sessionId) {
  * in its thread.
  */
 
-void join_session(Session *sessionList, int sessionId, const User *usr) {
+Session *join_session(Session *sessionList, int sessionId, const User *usr) {
 	// Check session exists outside & Find current session
 	Session *cur = isValidSession(sessionList, sessionId);
 	assert(cur != NULL);
 
 	// Malloc new user
-	User *newUsr = malloc(sizeof(User), 1);
+	User *newUsr = malloc(sizeof(User));
 	memcpy((void *)newUsr, (void *)usr, sizeof(User));
 
 	// Insert into session list
 	cur -> usr = add_user(cur -> usr, newUsr);
+
+	return sessionList;
+}
+
+/* Remove a session from list.
+ * Called by new_cliend() and leave_session()
+ */
+Session* remove_session(Session* sessionList, int sessionId) {
+	// Search for this session from sessionList
+	assert(sessionList != NULL);
+	
+	// First in list
+	if(sessionList -> sessionId == sessionId) {
+		Session *cur = sessionList -> next;
+		free(sessionList);
+		return cur;
+	}
+
+	else {
+		Session *cur = sessionList;
+		Session *prev;
+		while(cur != NULL) {
+			if(cur -> sessionId == sessionId) {
+				prev -> next = cur -> next;
+				free(cur);
+				break;
+			} else {
+				prev = cur;
+				cur = cur -> next;
+			}
+		}
+		return sessionList;
+	}
 }
 
 
 Session *leave_session(Session *sessionList, int sessionId, const User *usr) {
 	// Check session exists outside & Find current session
-	Session *cur isValidSession(sessionList, sessionId);
+	Session *cur = isValidSession(sessionList, sessionId);
 	assert(cur != NULL);
 
-	// Remove user from session
+	// Remove user from this session
 	assert(in_list(cur -> usr, usr));
-	remove_user(cur -> usr, usr -> uname);
+	cur -> usr = remove_user(cur -> usr, usr);
 
-	// If last user in session, the terminate session
+	// If last user in session, the remove session
 	if(cur -> usr == NULL) {
-		// Search for this session again from sessionList
-		assert(sessionList != NULL);
-
-		// First in list
-		if(sessionList -> sessionId == sessionId) {
-			Session *cur = sessionList -> next;
-			free(sessionList);
-			return cur;
-		}
-		
-		else {
-			Session *cur = sessionList;
-			Session *prev;
-			while(cur != NULl) {
-				if(cur -> sessionId == sessionId) {
-					prev -> next = cur -> next;
-					free(cur);
-					break;
-				} else {
-					prev = cur;
-					cur = cur -> next;
-				}
-			}
-		}
+		sessionList = remove_session(sessionList, sessionId);
 	}
 	return sessionList;
 }
@@ -118,3 +128,30 @@ void destroy_session_list(Session *sessionList) {
 		current = next;
 	}
 }
+
+// int main() {
+// 	sessionList = init_session(sessionList, 1);
+// 	sessionList = init_session(sessionList, 2);
+// 	sessionList = init_session(sessionList, 3);
+// 	sessionList = init_session(sessionList, 4);
+
+// 	sessionList = remove_session(sessionList, 1);
+// 	sessionList = remove_session(sessionList, 2);
+// 	sessionList = remove_session(sessionList, 3);
+// 	sessionList = remove_session(sessionList, 4);
+	
+// 	for(int i = 0; i < 4; ++i) {
+// 		if(isValidSession(sessionList, i + 1)) {
+// 			printf("Session %d is valid\n", i + 1);
+// 		} else {
+// 			printf("Session %d not valid\n", i + 1);
+// 		}
+// 	}
+	
+// 	if(sessionList == NULL) {
+// 		printf("Hello World");
+// 	}
+
+// 	destroy_session_list(sessionList);
+// 	return 0;
+// }
