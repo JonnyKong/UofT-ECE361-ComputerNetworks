@@ -28,6 +28,34 @@ User *add_user(User* userList, User *newUsr) {
     return newUsr;
 }
 
+// Remove user from a list based on username
+User *remove_user(User *userList, User *usr) {
+    if(userList == NULL) return;
+
+    // First in list
+    else if(strcmp(userList -> uname, usr -> uname) == 0) {
+        User *cur = userList -> next;
+        free(userList);
+        return cur;
+    }
+
+    else {
+        User *cur = userList;
+        User *prev;
+        while(cur != NULL) {
+            if(strcmp(cur -> uname, usr -> uname) == 0) {
+                prev -> next = cur -> next;
+                free(cur);
+                break;
+            } else {
+                prev = cur;
+                cur = cur -> next;
+            } 
+        }
+        return userList;
+    }
+}
+
 
 // Read user database from file
 User *init_userlist(FILE *fp) {
@@ -58,7 +86,6 @@ void destroy_userlist(User *root) {
         free(current);
         current = next;
     }
-    // printf("List Destroyed\n");
 }
 
 // Check username and password of user (valid, connected, logged in, etc)

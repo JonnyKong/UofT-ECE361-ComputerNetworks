@@ -37,13 +37,17 @@ bool inSession(Session *sessionList, int sessionId, const User *usr) {
 	}
 }
 
+/* Initialize new session.
+ * Session ends as last user leaves
+ */
 Session *init_session(Session *sessionList, int sessionId) {
-	Session *newSession = malloc(sizeof(Session));
+	Session *newSession = calloc(sizeof(Session), 1);
 	newSession -> sessionId = sessionId;
 	// Insert new session to head of the list
 	newSession -> next  = sessionList;
 	return newSession;
 }
+
 
 /* Insert new user into global session_list.
  * Have to insert usr into session list of each corresponding user
@@ -52,14 +56,65 @@ Session *init_session(Session *sessionList, int sessionId) {
 
 void join_session(Session *sessionList, int sessionId, const User *usr) {
 	// Check session exists outside & Find current session
-	Session *session = isValidSession(sessionList, sessionId);
-	assert(session != NULL);
+	Session *cur = isValidSession(sessionList, sessionId);
+	assert(cur != NULL);
 
 	// Malloc new user
-	User *newUsr = malloc(sizeof(User));
+	User *newUsr = malloc(sizeof(User), 1);
 	memcpy((void *)newUsr, (void *)usr, sizeof(User));
 
 	// Insert into session list
-	session -> usr = add_user(session -> usr, newUsr);
+	cur -> usr = add_user(cur -> usr, newUsr);
+}
 
+
+Session *leave_session(Session *sessionList, int sessionId, const User *usr) {
+	// Check session exists outside & Find current session
+	Session *cur isValidSession(sessionList, sessionId);
+	assert(cur != NULL);
+
+	// Remove user from session
+	assert(in_list(cur -> usr, usr));
+	remove_user(cur -> usr, usr -> uname);
+
+	// If last user in session, the terminate session
+	if(cur -> usr == NULL) {
+		// Search for this session again from sessionList
+		assert(sessionList != NULL);
+
+		// First in list
+		if(sessionList -> sessionId == sessionId) {
+			Session *cur = sessionList -> next;
+			free(sessionList);
+			return cur;
+		}
+		
+		else {
+			Session *cur = sessionList;
+			Session *prev;
+			while(cur != NULl) {
+				if(cur -> sessionId == sessionId) {
+					prev -> next = cur -> next;
+					free(cur);
+					break;
+				} else {
+					prev = cur;
+					cur = cur -> next;
+				}
+			}
+		}
+	}
+	return sessionList;
+}
+
+
+void destroy_session_list(Session *sessionList) {
+	Session *current = sessionList;
+	Session *next = current;
+	while(current != NULL) {
+		destroy_userlist(current -> usr);
+		next = current -> next;
+		free(current);
+		current = next;
+	}
 }
