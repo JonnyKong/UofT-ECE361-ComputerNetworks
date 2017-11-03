@@ -47,16 +47,16 @@ void *new_client(void *arg) {
 	Session *sessJoined = NULL;	// List of sessions joined
 	char buffer[BUF_SIZE];	// Buffer for recv()
 	char source[MAX_NAME];	// Username (valid after logged in)
-	int numbytes;
-	
+	int bytesSent, bytesRecvd;
+
 	// FSM states
 	bool loggedin = 0;
 
 	// The main recv() loop
 	while(1) {
 		memset(buffer, 0, sizeof(char) * BUF_SIZE);
-		if((numbytes = recv(newUsr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
-			perror("recv\n");
+		if((bytesSent = recv(newUsr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
+			perror("error recv\n");
 			exit(1);
 		}
 		buffer[numbytes] = '\0';
@@ -82,8 +82,14 @@ void *new_client(void *arg) {
 		if(loggedin == 0) {	
 
 			if(pktRecv.type == LOGIN) {	
-				// Check username and password
+				// Parse and check username and password
+				int cursor = 0;
+				while(pktRecv.data[cursor] != ' ') ++cursor;
+				memcpy(newUsr.uname, pktRecv.data, cursor);
+				strcpy(newUsr.pwd, pktRecv.data + cursor + 1)
 				bool vldusr = is_valid_user(userList, newUsr);
+				// Clear user password for safety
+				memset(newUsr.pwd, 0, PWDLEN);
 				
 				if(vldusr) {
 					pktSend.type = LO_ACK;
@@ -150,9 +156,20 @@ void *new_client(void *arg) {
 		}
 
 
-		// User logged in, leave session 
+		// User logged in, leave session, no reply
 		else if(pktRecv.type == LEAVE_SESS) {
-
+			// Iterate until all session left
+			while(sessJoined != NULL) {
+				int curSessId = sessJoined -> sessionId;
+				// Free private sessJoined
+				Session *cur = sessJoined;
+				sessJoined = sessJoined -> next;
+				free(cur);
+				// Free global sessionList
+				pthread_mutex_lock(sessionList_mutex);
+				sessionList = remove_session(sessionList, curSessId);
+				pthread_mutex_unlock(sessionList_mutex);
+			}
 		}
 
 
@@ -182,17 +199,64 @@ void *new_client(void *arg) {
 		// User send message
 		else if(pktRecv.type == MESSAGE) {
 
+			// Prepare message to be sent
+			memset(ptkSend, 0, sizeof(Packet));
+			pktSend.type = MESSAGE;
+			strcpy(pktSend.source, newUsr -> uname);
+			strcpy(pktSend.data, pktRecv.data);
+			pktSend.size = strlen(pktSend.data);
+			
+			// Use recv() buffer
+			memset(recv, 0, sizeof(char) * BUF_SIZE);
+			packetToString(&pktSend, buffer);
+
+			// Send though local session list
+			for(Session *cur = sessJoined; cur != NULL; cur = cur -> next) {
+				/* Send this message to all users in this session.
+				 * User may receive duplicate messages.
+				 */
+				// Find corresponding session in global sessionList
+				Session *sessToSend = isValidSession(sessionList, cur -> sessionId);
+				assert(sessToSend != NULL);
+				for(User *usr = sessToSend -> usr; usr != NULL; usr = usr -> next) {
+					if((bytesRecvd = send(usr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
+						perror("error send\n");
+						exit(1);
+					}
+				}
+			}
+			toSend = 0;
 		}
 
 
-		// User sends query
+		// Respond user query
 		else if(pktRecv.type == QUERY) {
-
+			int cursor = 0;
+			pktSend.type = QU_ACK;
+			toSend = 1;
+			/* Interate thorugh all sessions, output format:
+			 * Session1: user1 user2 user3
+			 * Session2: user5 user3 user6
+			 */
+			for(Session *curSess = sessionList; cur != NULL; cur = cur -> next) {
+				cursor += sprintf(pktSend.data + cursor, "Session %d:", cur -> sessionId);
+				for(User *usr = curSess -> usr; usr != NULL; usr = usr -> next) {
+					cursor += sprintf(pktSend.data + cursor, "\t%s", usr -> uname);
+				}
+				// Add carrige return after each session
+				pktSend.data[cursor++] = '\n';
+			}
 		}
 
 
 		if(toSend) {
-			// TODO: Add source and size for pktSend and send packet
+			// Add source and size for pktSend and send packet
+			memcpy(pktSend.source, newUsr -> uname);
+			pktSend.size = strlen(pekSend.data);
+
+			if((bytesRecvd = send(newUsr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
+				perror("error send\n");
+			}
 		}
 	}
 
@@ -289,7 +353,7 @@ int main() {
 			continue;
 		}
 		inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof(s));
-		pri8ntf("server: got connection from %s\n", s);
+		printf("server: got connection from %s\n", s);
 
 		// Update user info, and add user in connected list
 		// TODO?: add IP, port to newUsr
