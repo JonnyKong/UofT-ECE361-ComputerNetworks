@@ -28,7 +28,7 @@ int sessionCnt = 1;			// Session count begins from 1
 // Enforce synchronization
 pthread_mutex_t sessionList_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t userLoggedin_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t sessionCnt_m = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t sessionCnt_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 // get sockaddr, IPv4 or IPv6:
@@ -59,13 +59,13 @@ void *new_client(void *arg) {
 			perror("error recv\n");
 			exit(1);
 		}
-		buffer[numbytes] = '\0';
+		buffer[bytesSent] = '\0';
 		// printf("Client: received '%s'\n", buffer);
 		Packet pktRecv;		// Convert data into a new packet
 		Packet pktSend;		// Create packet to send
 		bool toSend = 0;	// Whether to send pktSend after this loop
 		stringToPacket(buffer, &pktRecv);
-		memset(pktSend, 0, sizeof(Packet));
+		memset(&pktSend, 0, sizeof(Packet));
 
 
 		/************ Finite State Machine *************/
@@ -85,11 +85,11 @@ void *new_client(void *arg) {
 				// Parse and check username and password
 				int cursor = 0;
 				while(pktRecv.data[cursor] != ' ') ++cursor;
-				memcpy(newUsr.uname, pktRecv.data, cursor);
-				strcpy(newUsr.pwd, pktRecv.data + cursor + 1)
+				memcpy(newUsr -> uname, (char *)(pktRecv.data), cursor);
+				strcpy(newUsr -> pwd, (char *)(pktRecv.data + cursor + 1));
 				bool vldusr = is_valid_user(userList, newUsr);
 				// Clear user password for safety
-				memset(newUsr.pwd, 0, PWDLEN);
+				memset(newUsr -> pwd, 0, PWDLEN);
 				
 				if(vldusr) {
 					pktSend.type = LO_ACK;
@@ -99,9 +99,9 @@ void *new_client(void *arg) {
 					// Add user to userLoggedin list
 					User *tmp = malloc(sizeof(User));
 					memcpy(tmp, newUsr, sizeof(User));
-					pthread_mutex_lock(userLoggedin_mutex);
+					pthread_mutex_lock(&userLoggedin_mutex);
 					userLoggedin = add_user(userLoggedin, tmp);
-					pthread_mutex_unlock(userLoggedin_mutex);
+					pthread_mutex_unlock(&userLoggedin_mutex);
 
 				} else {
 					pktSend.type = LO_NAK;
@@ -123,19 +123,19 @@ void *new_client(void *arg) {
 
 		// User logged in, join session
 		else if(pktRecv.type == JOIN) {
-			int sessionId = atoi(pckRecv.data);
+			int sessionId = atoi((char *)(pktRecv.data));
 			// Fails if session not exists
 			if(isValidSession(sessionList, sessionId) == NULL) {
 				pktSend.type = JN_NAK;
 				toSend = 1;
-				int cursor = sprintf(pktSend.data, "%d", sessionId);
+				int cursor = sprintf((char *)(pktSend.data), "%d", sessionId);
 				strcpy((char *)(pktSend.data + cursor), " Session not exist");
 			} 
 			// Fails if already joined session
 			else if(inSession(sessionList, sessionId, newUsr)) {
 				pktSend.type = JN_NAK;
 				toSend = 1;
-				int cursor = sprintf(pktSend.data, "%d", sessionId);
+				int cursor = sprintf((char *)(pktSend.data), "%d", sessionId);
 				strcpy((char *)(pktSend.data + cursor), " Session already joined");
 			}
 			// Success join session
@@ -143,12 +143,12 @@ void *new_client(void *arg) {
 				// Update pktSend JN_ACK
 				pktSend.type = JN_ACK;
 				toSend = 1;
-				sprintf(pktSend.data, "%d", sessionId);
+				sprintf((char *)(pktSend.data), "%d", sessionId);
 
 				// Update global sessionList
-				pthread_mutex_lock(sessionList_mutex);
+				pthread_mutex_lock(&sessionList_mutex);
 				sessionList = join_session(sessionList, sessionId, newUsr);
-				pthread_mutex_unlock(sessionList_mutex);
+				pthread_mutex_unlock(&sessionList_mutex);
 
 				// Update private sessJoined
 				sessJoined = init_session(sessJoined, sessionId);
@@ -166,9 +166,9 @@ void *new_client(void *arg) {
 				sessJoined = sessJoined -> next;
 				free(cur);
 				// Free global sessionList
-				pthread_mutex_lock(sessionList_mutex);
+				pthread_mutex_lock(&sessionList_mutex);
 				sessionList = remove_session(sessionList, curSessId);
-				pthread_mutex_unlock(sessionList_mutex);
+				pthread_mutex_unlock(&sessionList_mutex);
 			}
 		}
 
@@ -176,9 +176,9 @@ void *new_client(void *arg) {
 		// User create new session 
 		else if(pktRecv.type == NEW_SESS) {
 			// Update global session_list
-			pthread_mutex_lock(sessionList_mutex);
+			pthread_mutex_lock(&sessionList_mutex);
 			sessionList = init_session(sessionList, sessionCnt);
-			pthread_mutex_unlock(sessionList_mutex);
+			pthread_mutex_unlock(&sessionList_mutex);
 
 			// User join just created session
 			sessJoined = init_session(sessJoined, sessionCnt);
@@ -186,12 +186,12 @@ void *new_client(void *arg) {
 			// Update pktSend NS_ACK
 			pktSend.type = NS_ACK;
 			toSend = 1;
-			sprintf(pktSend.data, "%d", sessionCnt);
+			sprintf((char *)(pktSend.data), "%d", sessionCnt);
 
 			// Update sessionCnt
-			pthread_mutex_lock(sessionCnt_mutex);
+			pthread_mutex_lock(&sessionCnt_mutex);
 			++sessionCnt;
-			pthread_mutex_unlock(sessionCnt_mutex);
+			pthread_mutex_unlock(&sessionCnt_mutex);
 			
 		}
 
@@ -200,11 +200,11 @@ void *new_client(void *arg) {
 		else if(pktRecv.type == MESSAGE) {
 
 			// Prepare message to be sent
-			memset(ptkSend, 0, sizeof(Packet));
+			memset(&pktSend, 0, sizeof(Packet));
 			pktSend.type = MESSAGE;
-			strcpy(pktSend.source, newUsr -> uname);
-			strcpy(pktSend.data, pktRecv.data);
-			pktSend.size = strlen(pktSend.data);
+			strcpy((char *)(pktSend.source), newUsr -> uname);
+			strcpy((char *)(pktSend.data), (char *)(pktRecv.data));
+			pktSend.size = strlen((char *)(pktSend.data));
 			
 			// Use recv() buffer
 			memset(recv, 0, sizeof(char) * BUF_SIZE);
@@ -238,10 +238,10 @@ void *new_client(void *arg) {
 			 * Session1: user1 user2 user3
 			 * Session2: user5 user3 user6
 			 */
-			for(Session *curSess = sessionList; cur != NULL; cur = cur -> next) {
-				cursor += sprintf(pktSend.data + cursor, "Session %d:", cur -> sessionId);
+			for(Session *curSess = sessionList; curSess != NULL; curSess = curSess -> next) {
+				cursor += sprintf((char *)(pktSend.data) + cursor, "Session %d:", curSess -> sessionId);
 				for(User *usr = curSess -> usr; usr != NULL; usr = usr -> next) {
-					cursor += sprintf(pktSend.data + cursor, "\t%s", usr -> uname);
+					cursor += sprintf((char *)(pktSend.data) + cursor, "\t%s", usr -> uname);
 				}
 				// Add carrige return after each session
 				pktSend.data[cursor++] = '\n';
@@ -251,8 +251,8 @@ void *new_client(void *arg) {
 
 		if(toSend) {
 			// Add source and size for pktSend and send packet
-			memcpy(pktSend.source, newUsr -> uname);
-			pktSend.size = strlen(pekSend.data);
+			memcpy(pktSend.source, newUsr -> uname, UNAMELEN);
+			pktSend.size = strlen((char *)(pktSend.data));
 
 			if((bytesRecvd = send(newUsr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
 				perror("error send\n");
