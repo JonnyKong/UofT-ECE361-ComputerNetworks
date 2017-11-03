@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <signal.h>
 #include <pthread.h>
 
 #include "packet.h"
@@ -137,7 +138,7 @@ void *new_client(void *arg) {
 					printf("Log in failed from some user\n");
 
 					// Clear local user data for new login request
-					memcpy(newUsr -> uname, 0, UNAMELEN);
+					memset(newUsr -> uname, 0, UNAMELEN);
 				}
 			} else {
 				pktSend.type = LO_NAK;
