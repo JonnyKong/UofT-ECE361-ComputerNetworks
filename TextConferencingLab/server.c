@@ -52,21 +52,23 @@ void *new_client(void *arg) {
 	char source[MAX_NAME];	// Username (valid after logged in)
 	int bytesSent, bytesRecvd;
 
+	printf("New thread created\n");
+
 	// FSM states
 	bool loggedin = 0;
 
 	// The main recv() loop
 	while(1) {
 		memset(buffer, 0, sizeof(char) * BUF_SIZE);
-		if((bytesSent = recv(newUsr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
+		if((bytesRecvd = recv(newUsr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
 			perror("error recv\n");
 			exit(1);
 		}
-		buffer[bytesSent] = '\0';
-		// printf("Client: received '%s'\n", buffer);
+		buffer[bytesRecvd] = '\0';
 		Packet pktRecv;		// Convert data into a new packet
-		Packet pktSend;		// Create packet to send
+		Packet pktSend;		// Packet to send
 		bool toSend = 0;	// Whether to send pktSend after this loop
+		printf("Message received: \"%s\"\n", buffer);
 		stringToPacket(buffer, &pktRecv);
 		memset(&pktSend, 0, sizeof(Packet));
 
@@ -93,8 +95,12 @@ void *new_client(void *arg) {
 			pthread_mutex_lock(&userConnectedCnt_mutex);
 			--userConnectedCnt;
 			pthread_mutex_unlock(&userConnectedCnt_mutex);
-
-			printf("User %s exiting...\n", newUsr -> uname);
+			
+			if(loggedin) {
+				printf("User %s exiting...\n", newUsr -> uname);
+			} else {
+				printf("User exiting...\n");
+			}
 			return NULL;
 		}
 
@@ -124,7 +130,7 @@ void *new_client(void *arg) {
 					userLoggedin = add_user(userLoggedin, tmp);
 					pthread_mutex_unlock(&userLoggedin_mutex);
 
-					printf("User %s successfully logged in...\n", newUsr -> uname);
+					printf("User %s: Successfully logged in...\n", newUsr -> uname);
 
 				} else {
 					pktSend.type = LO_NAK;
@@ -135,7 +141,7 @@ void *new_client(void *arg) {
 					} else {
 						strcpy((char *)(pktSend.data), "User not registered");
 					}
-					printf("Log in failed from some user\n");
+					printf("Log in failed from anonymous user\n");
 
 					// Clear local user data for new login request
 					memset(newUsr -> uname, 0, UNAMELEN);
@@ -151,7 +157,7 @@ void *new_client(void *arg) {
 		// User logged in, join session
 		else if(pktRecv.type == JOIN) {
 			int sessionId = atoi((char *)(pktRecv.data));
-			printf("User %s trying to join session %d...\n", newUsr -> uname, sessionId);
+			printf("User %s: Trying to join session %d...\n", newUsr -> uname, sessionId);
 
 			// Fails if session not exists
 			if(isValidSession(sessionList, sessionId) == NULL) {
@@ -159,7 +165,7 @@ void *new_client(void *arg) {
 				toSend = 1;
 				int cursor = sprintf((char *)(pktSend.data), "%d", sessionId);
 				strcpy((char *)(pktSend.data + cursor), " Session not exist");
-				printf("User %s failed to join session %d\n", newUsr -> uname, sessionId);
+				printf("User %s: Failed to join session %d\n", newUsr -> uname, sessionId);
 			} 
 			// Fails if already joined session
 			else if(inSession(sessionList, sessionId, newUsr)) {
@@ -167,7 +173,7 @@ void *new_client(void *arg) {
 				toSend = 1;
 				int cursor = sprintf((char *)(pktSend.data), "%d", sessionId);
 				strcpy((char *)(pktSend.data + cursor), " Session already joined");
-				printf("User %s failed to join session %d\n", newUsr -> uname, sessionId);
+				printf("User %s: Failed to join session %d\n", newUsr -> uname, sessionId);
 			}
 			// Success join session
 			else {
@@ -184,7 +190,7 @@ void *new_client(void *arg) {
 				// Update private sessJoined
 				sessJoined = init_session(sessJoined, sessionId);
 
-				printf("User %s succeeded join session %d\n", newUsr -> uname, sessionId);
+				printf("User %s: Succeeded join session %d\n", newUsr -> uname, sessionId);
 			}
 		}
 
@@ -205,14 +211,14 @@ void *new_client(void *arg) {
 				sessionList = leave_session(sessionList, curSessId, newUsr);
 				pthread_mutex_unlock(&sessionList_mutex);
 
-				printf("\tUser %s left session %d\n", newUsr -> uname, curSessId);
+				printf("\tUser %s: Left session %d\n", newUsr -> uname, curSessId);
 			}
 		}
 
 
 		// User create new session 
 		else if(pktRecv.type == NEW_SESS) {
-			printf("User %s trying to create new session...:\n", newUsr -> uname);
+			printf("User %s: Trying to create new session...:\n", newUsr -> uname);
 
 			// Update global session_list
 			pthread_mutex_lock(&sessionList_mutex);
@@ -232,14 +238,14 @@ void *new_client(void *arg) {
 			++sessionCnt;
 			pthread_mutex_unlock(&sessionCnt_mutex);
 
-			printf("\tUser %s successfully created session %d\n", newUsr -> uname, sessionCnt - 1);
+			printf("\tUser %s: Successfully created session %d\n", newUsr -> uname, sessionCnt - 1);
 			
 		}
 
 
 		// User send message
 		else if(pktRecv.type == MESSAGE) {
-			printf("User %s sending message...\n", newUsr -> uname);
+			printf("User %s: Sending message...\n", newUsr -> uname);
 
 			// Prepare message to be sent
 			memset(&pktSend, 0, sizeof(Packet));
@@ -274,7 +280,7 @@ void *new_client(void *arg) {
 		// Respond user query
 		else if(pktRecv.type == QUERY) {
 			
-			printf("User %s making query...\n", newUsr -> uname);
+			printf("User %s: Making query...\n", newUsr -> uname);
 
 			int cursor = 0;
 			pktSend.type = QU_ACK;
@@ -331,7 +337,7 @@ int main() {
     }
     userList = init_userlist(fp);
 	fclose(fp);
-	printf("Server: Userdata loaded...\n");
+	printf("Server: Userdata loaded\n");
 
 
     // Setup server
@@ -346,7 +352,8 @@ int main() {
 	int rv;
 
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
+	// hints.ai_family = AF_UNSPEC;
+	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;    // Use TCP
 	hints.ai_flags = AI_PASSIVE;        // use my IP
 	if ((rv = getaddrinfo(NULL, port, &hints, &servinfo)) != 0) {
