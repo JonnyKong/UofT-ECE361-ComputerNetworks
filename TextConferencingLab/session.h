@@ -70,7 +70,7 @@ Session *join_session(Session *sessionList, int sessionId, const User *usr) {
 }
 
 /* Remove a session from list.
- * Called by new_cliend() and leave_session()
+ * Called by new_client() and leave_session()
  */
 Session* remove_session(Session* sessionList, int sessionId) {
 	// Search for this session from sessionList

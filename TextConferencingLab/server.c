@@ -24,11 +24,13 @@ Session *sessionList;			// List of all sessions created
 char inBuf[INBUF_SIZE] = {0};  	// Input buffer
 char port[6] = {0}; 			// Store port in string for getaddrinfo
 int sessionCnt = 1;			// Session count begins from 1
+int userConnectedCnt = 0;			// Count of users connected
 
 // Enforce synchronization
 pthread_mutex_t sessionList_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t userLoggedin_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t sessionCnt_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t userConnectedCnt_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 // get sockaddr, IPv4 or IPv6:
@@ -72,8 +74,26 @@ void *new_client(void *arg) {
 
 		// Can exit anytime
 		if(pktRecv.type == EXIT) {
-			// Thread exits, no ACK packet sent
-			// TODO: remove user from all lists, free memory
+			// Thread exits, no ACK packet sent, close socket
+			close(newUsr -> sockfd);
+
+			// Leave all session before user exits
+			for(Session *cur = sessJoined; cur != NULL; cur = cur -> next) {
+				pthread_mutex_lock(&sessionList_mutex);
+				sessionList = remove_session(sessionList, cur -> sessionId);
+				pthread_mutex_unlock(&sessionList_mutex);
+			}
+
+			// remove private session list, free memory
+			destroy_session_list(sessionList);
+			free(newUsr);
+
+			// Decrement userConnectedCnt
+			pthread_mutex_lock(&userConnectedCnt_mutex);
+			--userConnectedCnt;
+			pthread_mutex_unlock(&userConnectedCnt_mutex);
+
+			printf("User %s exiting...\n", newUsr -> uname);
 			return NULL;
 		}
 
@@ -103,6 +123,8 @@ void *new_client(void *arg) {
 					userLoggedin = add_user(userLoggedin, tmp);
 					pthread_mutex_unlock(&userLoggedin_mutex);
 
+					printf("User %s successfully logged in...\n", newUsr -> uname);
+
 				} else {
 					pktSend.type = LO_NAK;
 					toSend = 1;
@@ -112,6 +134,10 @@ void *new_client(void *arg) {
 					} else {
 						strcpy((char *)(pktSend.data), "User not registered");
 					}
+					printf("Log in failed from some user\n");
+
+					// Clear local user data for new login request
+					memcpy(newUsr -> uname, 0, UNAMELEN);
 				}
 			} else {
 				pktSend.type = LO_NAK;
@@ -124,12 +150,15 @@ void *new_client(void *arg) {
 		// User logged in, join session
 		else if(pktRecv.type == JOIN) {
 			int sessionId = atoi((char *)(pktRecv.data));
+			printf("User %s trying to join session %d...\n", newUsr -> uname, sessionId);
+
 			// Fails if session not exists
 			if(isValidSession(sessionList, sessionId) == NULL) {
 				pktSend.type = JN_NAK;
 				toSend = 1;
 				int cursor = sprintf((char *)(pktSend.data), "%d", sessionId);
 				strcpy((char *)(pktSend.data + cursor), " Session not exist");
+				printf("User %s failed to join session %d\n", newUsr -> uname, sessionId);
 			} 
 			// Fails if already joined session
 			else if(inSession(sessionList, sessionId, newUsr)) {
@@ -137,6 +166,7 @@ void *new_client(void *arg) {
 				toSend = 1;
 				int cursor = sprintf((char *)(pktSend.data), "%d", sessionId);
 				strcpy((char *)(pktSend.data + cursor), " Session already joined");
+				printf("User %s failed to join session %d\n", newUsr -> uname, sessionId);
 			}
 			// Success join session
 			else {
@@ -152,12 +182,16 @@ void *new_client(void *arg) {
 
 				// Update private sessJoined
 				sessJoined = init_session(sessJoined, sessionId);
+
+				printf("User %s succeeded join session %d\n", newUsr -> uname, sessionId);
 			}
 		}
 
 
 		// User logged in, leave session, no reply
 		else if(pktRecv.type == LEAVE_SESS) {
+			printf("User %s trying to leave all sessions...:\n", newUsr -> uname);
+			
 			// Iterate until all session left
 			while(sessJoined != NULL) {
 				int curSessId = sessJoined -> sessionId;
@@ -167,14 +201,18 @@ void *new_client(void *arg) {
 				free(cur);
 				// Free global sessionList
 				pthread_mutex_lock(&sessionList_mutex);
-				sessionList = remove_session(sessionList, curSessId);
+				sessionList = leave_session(sessionList, curSessId, newUsr);
 				pthread_mutex_unlock(&sessionList_mutex);
+
+				printf("\tUser %s left session %d\n", newUsr -> uname, curSessId);
 			}
 		}
 
 
 		// User create new session 
 		else if(pktRecv.type == NEW_SESS) {
+			printf("User %s trying to create new session...:\n", newUsr -> uname);
+
 			// Update global session_list
 			pthread_mutex_lock(&sessionList_mutex);
 			sessionList = init_session(sessionList, sessionCnt);
@@ -192,12 +230,15 @@ void *new_client(void *arg) {
 			pthread_mutex_lock(&sessionCnt_mutex);
 			++sessionCnt;
 			pthread_mutex_unlock(&sessionCnt_mutex);
+
+			printf("\tUser %s successfully created session %d\n", newUsr -> uname, sessionCnt - 1);
 			
 		}
 
 
 		// User send message
 		else if(pktRecv.type == MESSAGE) {
+			printf("User %s sending message...\n", newUsr -> uname);
 
 			// Prepare message to be sent
 			memset(&pktSend, 0, sizeof(Packet));
@@ -231,6 +272,9 @@ void *new_client(void *arg) {
 
 		// Respond user query
 		else if(pktRecv.type == QUERY) {
+			
+			printf("User %s making query...\n", newUsr -> uname);
+
 			int cursor = 0;
 			pktSend.type = QU_ACK;
 			toSend = 1;
@@ -246,6 +290,8 @@ void *new_client(void *arg) {
 				// Add carrige return after each session
 				pktSend.data[cursor++] = '\n';
 			}
+
+			printf("Query Result:\n%s", pktSend.data);
 		}
 
 
@@ -353,38 +399,26 @@ int main() {
 			continue;
 		}
 		inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof(s));
-		printf("server: got connection from %s\n", s);
+		printf("Server: got connection from %s\n", s);
 
-		// Update user info, and add user in connected list
-		// TODO?: add IP, port to newUsr
+		// Increment userConnectedCnt
+		pthread_mutex_lock(&userConnectedCnt_mutex);
+		++userConnectedCnt;
+		pthread_mutex_unlock(&userConnectedCnt_mutex);
 
 		// Create new thread to handle the new socket
 		pthread_create(&(newUsr -> p), NULL, new_client, (void *)newUsr);
 
+		// Temp: server quites as last user leaves session
+		if(userConnectedCnt == 0) break;
+		printf("All user have left session, server terminating...\n");
 	}
 
 
-
-
-
-
-
-
-
-
-
-	// Free memory
+	// Free global memory on exit
 	destroy_userlist(userList);
 	destroy_userlist(userLoggedin);
 	destroy_session_list(sessionList);
+	printf("Server Terminated\n");
     return 0;
 }
-
-
-
-
-
-
-
-
-
