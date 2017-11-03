@@ -15,9 +15,9 @@ typedef struct _User {
 
     // Client status
     int session_id;     // Valid if joined a session
-    char IP[IPLEN];     // Valid if connected
-    int port;           // Valid if connected
-    
+    // char IP[IPLEN];     // Valid if connected
+    // int port;           // Valid if connected
+    int sockfd;         // Valid if connected
     pthread_t p;        // Valid if connected
 
     // Linked list support

@@ -33,10 +33,16 @@ void *get_in_addr(struct sockaddr *sa) {
 }
 
 
-// Subroutine to handle
+// Subroutine to handle new connections
+void *new_client(void *arg) {
+	User *newUsr = (User*)arg;
+
+	// Check username and password
+	return NULL;
+}
 
 
-int main() {
+int mai() {
     // Get user input
     memset(inBuf, 0, INBUF_SIZE * sizeof(char));
 	fgets(inBuf, INBUF_SIZE, stdin);
@@ -61,7 +67,8 @@ int main() {
 
 
     // Setup server
-    int sockfd, new_fd;     // listen on sock_fd, new connection on new_fd
+	int sockfd;     // listen on sock_fd, new connection on new_fd
+	// int new_fd;		
 	struct addrinfo hints, *servinfo, *p;
 	struct sockaddr_storage their_addr; // connector's address information
 	socklen_t sin_size;
@@ -116,10 +123,11 @@ int main() {
 	// main accept() loop
 	while(1) {
 
-		// Accept new incoming connections
+		// Accept new incoming connections 
+		User *newUsr = malloc(sizeof(User));
 		sin_size = sizeof(their_addr);
-		new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
-		if (new_fd == -1) {
+		newUsr -> sockfd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+		if (newUsr -> sockfd == -1) {
 			perror("accept");
 			continue;
 		}
@@ -127,12 +135,10 @@ int main() {
 		printf("server: got connection from %s\n", s);
 
 		// Update user info, and add user in connected list
-		User *newUsr = malloc(sizeof(User));
-		// TODO: add IP, port to newUsr
-		userConnected = add_user(userConnected, newUsr);
+		// TODO?: add IP, port to newUsr
 
 		// Create new thread to handle the new socket
-		// pthread_create(&(newUsr -> p), );
+		pthread_create(&(newUsr -> p), NULL, new_client, (void *)newUsr);
 
 	}
 
@@ -149,4 +155,7 @@ int main() {
 
     destroy_userlist(userList);
     return 0;
+}
+
+int main() {
 }
