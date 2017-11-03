@@ -23,6 +23,12 @@ User *userLoggedin = NULL;		// List of users logged in
 Session *sessionList;			// List of all sessions created
 char inBuf[INBUF_SIZE] = {0};  	// Input buffer
 char port[6] = {0}; 			// Store port in string for getaddrinfo
+int sessionCnt = 1;			// Session count begins from 1
+
+// Enforce synchronization
+pthread_mutex_t sessionList_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t userLoggedin_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t sessionCnt_m = PTHREAD_MUTEX_INITIALIZER;
 
 
 // get sockaddr, IPv4 or IPv6:
@@ -45,7 +51,6 @@ void *new_client(void *arg) {
 	
 	// FSM states
 	bool loggedin = 0;
-	int session_cnt = 0;
 
 	// The main recv() loop
 	while(1) {
@@ -60,15 +65,18 @@ void *new_client(void *arg) {
 		Packet pktSend;		// Create packet to send
 		bool toSend = 0;	// Whether to send pktSend after this loop
 		stringToPacket(buffer, &pktRecv);
+		memset(pktSend, 0, sizeof(Packet));
 
 
 		/************ Finite State Machine *************/
+
 		// Can exit anytime
 		if(pktRecv.type == EXIT) {
 			// Thread exits, no ACK packet sent
-			// TODO: remove user from all lists
+			// TODO: remove user from all lists, free memory
 			return NULL;
 		}
+
 		
 		// Before login, the user can only login or exit
 		if(loggedin == 0) {	
@@ -81,6 +89,14 @@ void *new_client(void *arg) {
 					pktSend.type = LO_ACK;
 					toSend = 1;
 					loggedin = 1;
+					
+					// Add user to userLoggedin list
+					User *tmp = malloc(sizeof(User));
+					memcpy(tmp, newUsr, sizeof(User));
+					pthread_mutex_lock(userLoggedin_mutex);
+					userLoggedin = add_user(userLoggedin, tmp);
+					pthread_mutex_unlock(userLoggedin_mutex);
+
 				} else {
 					pktSend.type = LO_NAK;
 					toSend = 1;
@@ -98,15 +114,85 @@ void *new_client(void *arg) {
 			}
 		}
 
-		// User logged in, but have not joined session
-		else if(0) {
+
+		// User logged in, join session
+		else if(pktRecv.type == JOIN) {
+			int sessionId = atoi(pckRecv.data);
+			// Fails if session not exists
+			if(isValidSession(sessionList, sessionId) == NULL) {
+				pktSend.type = JN_NAK;
+				toSend = 1;
+				int cursor = sprintf(pktSend.data, "%d", sessionId);
+				strcpy((char *)(pktSend.data + cursor), " Session not exist");
+			} 
+			// Fails if already joined session
+			else if(inSession(sessionList, sessionId, newUsr)) {
+				pktSend.type = JN_NAK;
+				toSend = 1;
+				int cursor = sprintf(pktSend.data, "%d", sessionId);
+				strcpy((char *)(pktSend.data + cursor), " Session already joined");
+			}
+			// Success join session
+			else {
+				// Update pktSend JN_ACK
+				pktSend.type = JN_ACK;
+				toSend = 1;
+				sprintf(pktSend.data, "%d", sessionId);
+
+				// Update global sessionList
+				pthread_mutex_lock(sessionList_mutex);
+				sessionList = join_session(sessionList, sessionId, newUsr);
+				pthread_mutex_unlock(sessionList_mutex);
+
+				// Update private sessJoined
+				sessJoined = init_session(sessJoined, sessionId);
+			}
+		}
+
+
+		// User logged in, leave session 
+		else if(pktRecv.type == LEAVE_SESS) {
 
 		}
 
 
+		// User create new session 
+		else if(pktRecv.type == NEW_SESS) {
+			// Update global session_list
+			pthread_mutex_lock(sessionList_mutex);
+			sessionList = init_session(sessionList, sessionCnt);
+			pthread_mutex_unlock(sessionList_mutex);
+
+			// User join just created session
+			sessJoined = init_session(sessJoined, sessionCnt);
+
+			// Update pktSend NS_ACK
+			pktSend.type = NS_ACK;
+			toSend = 1;
+			sprintf(pktSend.data, "%d", sessionCnt);
+
+			// Update sessionCnt
+			pthread_mutex_lock(sessionCnt_mutex);
+			++sessionCnt;
+			pthread_mutex_unlock(sessionCnt_mutex);
+			
+		}
+
+
+		// User send message
+		else if(pktRecv.type == MESSAGE) {
+
+		}
+
+
+		// User sends query
+		else if(pktRecv.type == QUERY) {
+
+		}
+
 
 		if(toSend) {
-			// TODO: Add source and size for pktSend
+			// TODO: Add source and size for pktSend and send packet
 		}
 	}
 
