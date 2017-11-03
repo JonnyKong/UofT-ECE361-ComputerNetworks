@@ -6,7 +6,7 @@
 #define MAX_NAME 32
 #define MAX_DATA 512
 
-#define SEND_BUF_SIZE 600
+#define BUF_SIZE 600
 
 enum msgType {
     LOGIN,
@@ -26,7 +26,7 @@ enum msgType {
 
 typedef struct packet {
     unsigned int type;  // msgType
-    unsigned int size;
+    unsigned int size;  // Size of data
     unsigned char source[MAX_NAME];
     unsigned char data[MAX_DATA];
 } Packet;
@@ -38,7 +38,7 @@ typedef struct packet {
 void packetToString(const Packet *packet, char *dest) {
     
     //Initialize string buffer
-    memset(dest, 0, sizeof(char) * SEND_BUF_SIZE);
+    memset(dest, 0, sizeof(char) * BUF_SIZE);
 
     // Load data into string
     int cursor = 0;
