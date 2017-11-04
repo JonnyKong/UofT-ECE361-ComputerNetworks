@@ -294,45 +294,41 @@ void send_text(int socketfd) {
 }
 
 int main() {
-	const int LOGIN_CMD_LEN = strlen(LOGIN_CMD);
-	const int LOGOUT_CMD_LEN = strlen(LOGOUT_CMD);
-	const int JOINSESSION_CMD_LEN = strlen(JOINSESSION_CMD);
-	const int LEAVESESSION_CMD_LEN = strlen(LEAVESESSION_CMD);
-	const int CREATESESSION_CMD_LEN = strlen(CREATESESSION_CMD);
-	const int LIST_CMD_LEN = strlen(LIST_CMD);
-	const int QUIT_CMD_LEN = strlen(QUIT_CMD);
-
 	char *pch;
+	int toklen;
 	int socketfd = INVALID_SOCKET;
 	pthread_t receive_thread;
 
 	for (;;) {
 		fgets(buf, BUF_SIZE - 1, stdin);
+		// set the input of newliner as end of input
 	  buf[strcspn(buf, "\n")] = 0;
     pch = buf;
     while (*pch == ' ') pch++;
     if (*pch == 0) {
       // ignore empty command
       continue;
-    }
-    pch = strtok(buf, " ");
-		if (strncmp(pch, LOGIN_CMD, LOGIN_CMD_LEN) == 0) {
+    } 
+		pch = strtok(buf, " ");
+		toklen = strlen(pch);
+		if (strncmp(pch, LOGIN_CMD, toklen) == 0) {
 			login(pch, &socketfd, &receive_thread);
-		} else if (strncmp(pch, LOGOUT_CMD, LOGOUT_CMD_LEN) == 0) {
+		} else if (strncmp(pch, LOGOUT_CMD, toklen) == 0) {
 			logout(&socketfd, &receive_thread);
-		} else if (strncmp(pch, JOINSESSION_CMD, JOINSESSION_CMD_LEN) == 0) {
+		} else if (strncmp(pch, JOINSESSION_CMD, toklen) == 0) {
 			joinsession(pch, &socketfd);
-		} else if (strncmp(pch, LEAVESESSION_CMD, LEAVESESSION_CMD_LEN) == 0) {
+		} else if (strncmp(pch, LEAVESESSION_CMD, toklen) == 0) {
 			leavesession(socketfd);
-		} else if (strncmp(pch, CREATESESSION_CMD, CREATESESSION_CMD_LEN) == 0) {
+		} else if (strncmp(pch, CREATESESSION_CMD, toklen) == 0) {
 			createsession(socketfd);
-		} else if (strncmp(pch, LIST_CMD, LIST_CMD_LEN) == 0) {
+		} else if (strncmp(pch, LIST_CMD, toklen) == 0) {
 			list(socketfd);
-		} else if (strncmp(pch, QUIT_CMD, QUIT_CMD_LEN) == 0) {
+		} else if (strncmp(pch, QUIT_CMD, toklen) == 0) {
 			logout(&socketfd, &receive_thread);
 			break;
 		} else {
-		  buf[strlen(pch)] = ' ';
+			// restore the buffer to send the original text
+			buf[toklen] = ' ';
       send_text(socketfd);
 		}
 	}
