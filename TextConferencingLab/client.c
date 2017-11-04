@@ -8,6 +8,7 @@
 #include <stdbool.h>
 
 #define BUF_SIZE 1024
+
 #define INVALID_SOCKET - 1
 // buffer for send and receive
 char buf[BUF_SIZE];
