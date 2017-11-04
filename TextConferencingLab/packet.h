@@ -24,7 +24,7 @@ enum msgType {
     QU_ACK
 };
 
-typedef struct packet {
+typedef struct lab3message {
     unsigned int type;  // msgType
     unsigned int size;  // Size of data
     unsigned char source[MAX_NAME];
