@@ -33,7 +33,10 @@ void *receive(void *socketfd_void_p) {
 			fprintf(stderr, "client receive: recv\n");
 			return NULL;
 		}
+    buf[numbytes] = 0;
+    //fprintf(stdout, "buf: %s\n", buf);
 		stringToPacket(buf, &packet);
+    //fprintf(stdout, "packet.type: %d, packet.data: %s\n", packet.type, packet.data);
     if (packet.type == JN_ACK) {
       fprintf(stdout, "Successfully joined session %s.\n", packet.data);
       insession = true;
@@ -41,16 +44,18 @@ void *receive(void *socketfd_void_p) {
       fprintf(stdout, "Join failure. Detail: %s\n", packet.data);
       insession = false;
     } else if (packet.type == NS_ACK) {
-      fprintf(stdout, "Successfully created session %s.\n", packet.data);
+      fprintf(stdout, "Successfully created and joined session %s.\n", packet.data);
       insession = true;
     } else if (packet.type == QU_ACK) {
       fprintf(stdout, "Session #\tUser_ids\n%s", packet.data);
     } else if (packet.type == MESSAGE){   
-      fprintf(stdout, "%s: %s", packet.source, packet.data);
+      fprintf(stdout, "%s: %s\n", packet.source, packet.data);
     } else {
       fprintf(stdout, "Unexpected packet received: type %d, data %s\n",
           packet.type, packet.data);
     }
+    // solve the ghost-newliner 
+    fflush(stdout);
 	}
 	return NULL;
 }
@@ -133,7 +138,7 @@ void login(char *pch, int *socketfd_p, pthread_t *receive_thread_p) {
       *socketfd_p = INVALID_SOCKET;
 			return;
 		}
-    
+    buf[numbytes] = 0; 
     stringToPacket(buf, &packet);
     if (packet.type == LO_ACK && 
         pthread_create(receive_thread_p, NULL, receive, socketfd_p) == 0) {
@@ -199,7 +204,7 @@ void joinsession(char *pch, int *socketfd_p) {
     packet.type = JOIN;
     strncpy(packet.data, session_id, MAX_DATA);
     packet.size = strlen(packet.data);
-
+    packetToString(&packet, buf);
 		if ((numbytes = send(*socketfd_p, buf, BUF_SIZE - 1, 0)) == -1) {
 			fprintf(stderr, "client: send\n");
 			return;
@@ -228,31 +233,24 @@ void leavesession(int socketfd) {
   insession = false;
 }
 
-void createsession(char *pch, int *socketfd_p) {
-	if (*socketfd_p == INVALID_SOCKET) {
+void createsession(int socketfd) {
+	if (socketfd == INVALID_SOCKET) {
 		fprintf(stdout, "You have not logged in to any server.\n");
 		return;
 	} else if (insession) {
     fprintf(stdout, "You have already joined a session.\n");
     return;
   }
-
-	char *session_id;
-	pch = strtok(NULL, " ");
-	session_id = pch;
-	if (session_id == NULL) {
-		fprintf(stdout, "usage: /createsession <session_id>\n");
-	} else {
-		int numbytes;
-    Packet packet;
-    packet.type = NEW_SESS;
-    packet.size = 0;
-    packetToString(&packet, buf);		
-		if ((numbytes = send(*socketfd_p, buf, BUF_SIZE - 1, 0)) == -1) {
-			fprintf(stderr, "client: send\n");
-			return; 
-		}
-  }
+	
+  int numbytes;
+  Packet packet;
+  packet.type = NEW_SESS;
+  packet.size = 0;
+  packetToString(&packet, buf);		
+  if ((numbytes = send(socketfd, buf, BUF_SIZE - 1, 0)) == -1) {
+    fprintf(stderr, "client: send\n");
+    return; 
+  } 
 }
 
 void list(int socketfd) {
@@ -284,6 +282,7 @@ void send_text(int socketfd) {
 	int numbytes;
   Packet packet;
   packet.type = MESSAGE;
+  
   strncpy(packet.data, buf, MAX_DATA);
   packet.size = strlen(packet.data); 
   packetToString(&packet, buf);	
@@ -309,7 +308,13 @@ int main() {
 
 	for (;;) {
 		fgets(buf, BUF_SIZE - 1, stdin);
-		buf[strcspn(buf, "\r\n")] = 0;
+	  buf[strcspn(buf, "\n")] = 0;
+    pch = buf;
+    while (*pch == ' ') pch++;
+    if (*pch == 0) {
+      // ignore empty command
+      continue;
+    }
     pch = strtok(buf, " ");
 		if (strncmp(pch, LOGIN_CMD, LOGIN_CMD_LEN) == 0) {
 			login(pch, &socketfd, &receive_thread);
@@ -320,17 +325,17 @@ int main() {
 		} else if (strncmp(pch, LEAVESESSION_CMD, LEAVESESSION_CMD_LEN) == 0) {
 			leavesession(socketfd);
 		} else if (strncmp(pch, CREATESESSION_CMD, CREATESESSION_CMD_LEN) == 0) {
-			createsession(pch, &socketfd);
+			createsession(socketfd);
 		} else if (strncmp(pch, LIST_CMD, LIST_CMD_LEN) == 0) {
 			list(socketfd);
 		} else if (strncmp(pch, QUIT_CMD, QUIT_CMD_LEN) == 0) {
 			logout(&socketfd, &receive_thread);
 			break;
 		} else {
-			send_text(socketfd);
+		  buf[strlen(pch)] = ' ';
+      send_text(socketfd);
 		}
 	}
 	fprintf(stdout, "You have quit successfully.\n");
 	return 0;
 }
-
