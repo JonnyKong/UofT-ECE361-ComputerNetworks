@@ -14,9 +14,7 @@ typedef struct _User {
     char pwd[PWDLEN];       // Valid if logged in
 
     // Client status
-    int session_id;     // Valid if joined a session
-    char IP[IPLEN];     // Valid if connected
-    int port;           // Valid if connected
+    int sockfd;         // Valid if connected
     pthread_t p;        // Valid if connected
 
     // Linked list support
@@ -28,6 +26,34 @@ typedef struct _User {
 User *add_user(User* userList, User *newUsr) {
     newUsr -> next = userList;
     return newUsr;
+}
+
+// Remove user from a list based on username
+User *remove_user(User *userList, User const *usr) {
+    if(userList == NULL) return NULL;
+
+    // First in list
+    else if(strcmp(userList -> uname, usr -> uname) == 0) {
+        User *cur = userList -> next;
+        free(userList);
+        return cur;
+    }
+
+    else {
+        User *cur = userList;
+        User *prev;
+        while(cur != NULL) {
+            if(strcmp(cur -> uname, usr -> uname) == 0) {
+                prev -> next = cur -> next;
+                free(cur);
+                break;
+            } else {
+                prev = cur;
+                cur = cur -> next;
+            } 
+        }
+        return userList;
+    }
 }
 
 
@@ -60,14 +86,25 @@ void destroy_userlist(User *root) {
         free(current);
         current = next;
     }
-    // printf("List Destroyed\n");
 }
 
-// Check if usr is in list (valid, connected, logged in, etc)
+// Check username and password of user (valid, connected, logged in, etc)
 bool is_valid_user(const User *userList, const User *usr) {
     const User *current = userList;
     while(current != NULL) {
         if(strcmp(current -> uname, usr -> uname) == 0 && strcmp(current -> pwd, usr -> pwd) == 0) {
+            return 1;    
+        }
+        current = current -> next;
+    }
+    return 0;
+}
+
+// Check if user is in list (matches username)
+bool in_list(const User *userList, const User *usr) {
+    const User *current = userList;
+    while(current != NULL) {
+        if(strcmp(current -> uname, usr -> uname) == 0) {
             return 1;    
         }
         current = current -> next;
