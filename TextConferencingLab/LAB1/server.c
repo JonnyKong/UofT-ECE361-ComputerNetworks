@@ -49,8 +49,8 @@ void *new_client(void *arg) {
 
 	User *newUsr = (User*)arg;
 	Session *sessJoined = NULL;	// List of sessions joined
-	char buffer[BUF_SIZE] = {0};	// Buffer for recv()
-	char source[MAX_NAME] = {0};	// Username (valid after logged in)
+	char buffer[BUF_SIZE];	// Buffer for recv()
+	char source[MAX_NAME];	// Username (valid after logged in)
 	int bytesSent, bytesRecvd;
 
 	Packet pktRecv;		// Convert received data into packet
@@ -60,6 +60,7 @@ void *new_client(void *arg) {
 
 	// FSM states
 	bool loggedin = 0;
+	bool toExit = 0;
 
 	// The main recv() loop
 	while(1) {
@@ -74,7 +75,7 @@ void *new_client(void *arg) {
 		buffer[bytesRecvd] = '\0';
 		
 		bool toSend = 0;	// Whether to send pktSend after this loop
-		printf("Message from user %s: %s\n", buffer, source);
+		printf("Message received: \"%s\"\n", buffer);
 
 		stringToPacket(buffer, &pktRecv);
 		memset(&pktSend, 0, sizeof(Packet));
@@ -82,31 +83,7 @@ void *new_client(void *arg) {
 
 		// Can exit anytime
 		if(pktRecv.type == EXIT) {
-			// Thread exits, no ACK packet sent, close socket
-			close(newUsr -> sockfd);
-
-			// Leave all session before user exits
-			for(Session *cur = sessJoined; cur != NULL; cur = cur -> next) {
-				pthread_mutex_lock(&sessionList_mutex);
-				sessionList = remove_session(sessionList, cur -> sessionId);
-				pthread_mutex_unlock(&sessionList_mutex);
-			}
-
-			// remove private session list, free memory
-			destroy_session_list(sessionList);
-			free(newUsr);
-
-			// Decrement userConnectedCnt
-			pthread_mutex_lock(&userConnectedCnt_mutex);
-			--userConnectedCnt;
-			pthread_mutex_unlock(&userConnectedCnt_mutex);
-
-			if(loggedin) {
-				printf("User %s exiting...\n", source);
-			} else {
-				printf("User exiting...\n");
-			}
-			return NULL;
+			toExit = 1;
 		}
 
 		
@@ -163,7 +140,8 @@ void *new_client(void *arg) {
 					printf("Log in failed from anonymous user\n");
 
 					// Clear local user data for new login request
-					memset(newUsr -> uname, 0, UNAMELEN);
+					// memset(newUsr -> uname, 0, UNAMELEN);
+					toExit = 1;
 				}
 			} else {
 				pktSend.type = LO_NAK;
@@ -300,6 +278,9 @@ void *new_client(void *arg) {
 		// User send message
 		else if(pktRecv.type == MESSAGE) {
 			printf("User %s: Sending message \"%s\"\n", newUsr -> uname, pktRecv.data);
+			
+			// Session to send to
+			int curSess = atoi(pktRecv.source);
 
 			// Prepare message to be sent
 			memset(&pktSend, 0, sizeof(Packet));
@@ -311,13 +292,16 @@ void *new_client(void *arg) {
 			// Use recv() buffer
 			memset(buffer, 0, sizeof(char) * BUF_SIZE);
 			packetToString(&pktSend, buffer);
-			printf("Server: Broadcasting message: \"%s\"\n", buffer);
+			printf("Server: Broadcasting message to session %d: \"%s\"\n", buffer, curSess);
 
 			// Send though local session list
 			for(Session *cur = sessJoined; cur != NULL; cur = cur -> next) {
 				/* Send this message to all users in this session.
 				 * User may receive duplicate messages.
 				 */
+
+				// Not the session to send
+				// if(cur -> sessionId != curSess) continue;
 
 				// Find corresponding session in global sessionList
 				Session *sessToSend = isValidSession(sessionList, cur -> sessionId);
@@ -383,7 +367,36 @@ void *new_client(void *arg) {
 			}
 		}
 		printf("\n");
+
+		if(toExit) break;
 	}
+
+	// Thread exits, no ACK packet sent, close socket
+	close(newUsr -> sockfd);
+	
+	// Leave all session before user exits
+	for(Session *cur = sessJoined; cur != NULL; cur = cur -> next) {
+		pthread_mutex_lock(&sessionList_mutex);
+		sessionList = remove_session(sessionList, cur -> sessionId);
+		pthread_mutex_unlock(&sessionList_mutex);
+	}
+
+	// remove private session list, free memory
+	destroy_session_list(sessionList);
+	free(newUsr);
+
+	// Decrement userConnectedCnt
+	pthread_mutex_lock(&userConnectedCnt_mutex);
+	--userConnectedCnt;
+	pthread_mutex_unlock(&userConnectedCnt_mutex);
+
+	if(loggedin) {
+		printf("User %s exiting...\n", source);
+	} else {
+		printf("User exiting...\n");
+	}
+	printf('\n');
+	return NULL;
 
 }
 
