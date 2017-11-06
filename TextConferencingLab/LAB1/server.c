@@ -294,7 +294,7 @@ void *new_client(void *arg) {
 			// Use recv() buffer
 			memset(buffer, 0, sizeof(char) * BUF_SIZE);
 			packetToString(&pktSend, buffer);
-			printf("Server: Broadcasting message to session %s:\t%d\n", buffer, curSess);
+			printf("Server: Broadcasting message to session %d:\t%s\n", curSess, buffer);
 
 			// Send though local session list
 			for(Session *cur = sessJoined; cur != NULL; cur = cur -> next) {
