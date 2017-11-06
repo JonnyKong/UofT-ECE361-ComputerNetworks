@@ -161,7 +161,7 @@ bool inSession(Session *sessionList, int sessionId, const User *usr) {
 /* Initialize new session.
  * Session ends as last user leaves
  */
-Session *init_session(Session *sessionList, int sessionId) {
+Session *init_session(Session *sessionList, const int sessionId) {
 	Session *newSession = calloc(sizeof(Session), 1);
 	newSession -> sessionId = sessionId;
 	// Insert new session to head of the list
