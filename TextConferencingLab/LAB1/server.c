@@ -383,6 +383,15 @@ void *new_client(void *arg) {
 		pthread_mutex_unlock(&sessionList_mutex);
 	}
 
+	// Remove from global userConnected
+	for(User *usr userConnected; usr != NULL; usr = usr -> next) {
+		if(strcmp(source, usr -> uname) == 0) {
+			sessJoined = destroy_session_list(sessJoined);
+			break;
+		}
+	}
+	userConnected = remove_user(userConnected, newUsr);
+
 	// remove private session list, free memory
 	destroy_session_list(sessionList);
 	free(newUsr);
