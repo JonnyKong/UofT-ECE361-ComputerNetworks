@@ -60,6 +60,7 @@ void *new_client(void *arg) {
 
 	// FSM states
 	bool loggedin = 0;
+	bool toExit = 0;
 
 	// The main recv() loop
 	while(1) {
@@ -82,7 +83,7 @@ void *new_client(void *arg) {
 
 		// Can exit anytime
 		if(pktRecv.type == EXIT) {
-			break;
+			toExit = 1;
 		}
 
 		
@@ -140,7 +141,7 @@ void *new_client(void *arg) {
 
 					// Clear local user data for new login request
 					// memset(newUsr -> uname, 0, UNAMELEN);
-					break;
+					toExit = 1;
 				}
 			} else {
 				pktSend.type = LO_NAK;
@@ -366,6 +367,8 @@ void *new_client(void *arg) {
 			}
 		}
 		printf("\n");
+
+		if(toExit) break;
 	}
 
 	// Thread exits, no ACK packet sent, close socket
