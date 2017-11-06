@@ -63,6 +63,8 @@ void packetToString(const Packet *packet, char *dest) {
 // Convert str to packet
 void stringToPacket(const char *str, Packet *dest_packet) {
 
+    memset(dest_packet -> data, 0, MAX_DATA);
+
     // Compile Regex to match ":"
     regex_t regex;
     if(regcomp(&regex, "[:]", REG_EXTENDED)) {

@@ -1,8 +1,11 @@
+#ifndef SESSION_H_
+#define SESSION_H_
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
 
-// #include "user.h"
+#include "user.h"
 
 typedef struct _Session {
 	int sessionId;
@@ -155,3 +158,6 @@ void destroy_session_list(Session *sessionList) {
 // 	destroy_session_list(sessionList);
 // 	return 0;
 // }
+
+
+#endif
