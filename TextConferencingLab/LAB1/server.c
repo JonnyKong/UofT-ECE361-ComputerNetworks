@@ -243,7 +243,7 @@ packetToString(&pktSend, buffer);
 			printf("User %s: Trying to create new session...:\n", newUsr -> uname);
 
 			// Update global session_list
-packetToString(&pktSend, buffer);
+			packetToString(&pktSend, buffer);
 			pthread_mutex_lock(&sessionList_mutex);
 			sessionList = init_session(sessionList, sessionCnt);
 			pthread_mutex_unlock(&sessionList_mutex);

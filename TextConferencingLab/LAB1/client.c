@@ -47,7 +47,7 @@ void *receive(void *socketfd_void_p) {
       fprintf(stdout, "Successfully created and joined session %s.\n", packet.data);
       insession = true;
     } else if (packet.type == QU_ACK) {
-      fprintf(stdout, "Session #\tUser_ids\n%s", packet.data);
+      fprintf(stdout, "User id\t\tSession ids\n%s", packet.data);
     } else if (packet.type == MESSAGE){   
       fprintf(stdout, "%s: %s\n", packet.source, packet.data);
     } else {
@@ -112,7 +112,9 @@ void login(char *pch, int *socketfd_p, pthread_t *receive_thread_p) {
 		}
 		if (p == NULL) {
 			fprintf(stderr, "client: failed to connect from addrinfo\n");
-			return;
+			close(*socketfd_p);
+      *socketfd_p = INVALID_SOCKET;
+      return;
 		}
 		inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof s);
 		printf("client: connecting to %s\n", s);
@@ -311,19 +313,19 @@ int main() {
     } 
 		pch = strtok(buf, " ");
 		toklen = strlen(pch);
-		if (strncmp(pch, LOGIN_CMD, toklen) == 0) {
+		if (strcmp(pch, LOGIN_CMD) == 0) {
 			login(pch, &socketfd, &receive_thread);
-		} else if (strncmp(pch, LOGOUT_CMD, toklen) == 0) {
+		} else if (strcmp(pch, LOGOUT_CMD) == 0) {
 			logout(&socketfd, &receive_thread);
-		} else if (strncmp(pch, JOINSESSION_CMD, toklen) == 0) {
+		} else if (strcmp(pch, JOINSESSION_CMD) == 0) {
 			joinsession(pch, &socketfd);
-		} else if (strncmp(pch, LEAVESESSION_CMD, toklen) == 0) {
+		} else if (strcmp(pch, LEAVESESSION_CMD) == 0) {
 			leavesession(socketfd);
-		} else if (strncmp(pch, CREATESESSION_CMD, toklen) == 0) {
+		} else if (strcmp(pch, CREATESESSION_CMD) == 0) {
 			createsession(socketfd);
-		} else if (strncmp(pch, LIST_CMD, toklen) == 0) {
+		} else if (strcmp(pch, LIST_CMD) == 0) {
 			list(socketfd);
-		} else if (strncmp(pch, QUIT_CMD, toklen) == 0) {
+		} else if (strcmp(pch, QUIT_CMD) == 0) {
 			logout(&socketfd, &receive_thread);
 			break;
 		} else {
