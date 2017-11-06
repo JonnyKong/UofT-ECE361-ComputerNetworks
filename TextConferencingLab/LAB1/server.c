@@ -227,7 +227,7 @@ void *new_client(void *arg) {
 			for(User *usr = userLoggedin; usr != NULL; usr = usr -> next) {
 				if(strcmp(usr -> uname, source) == 0) {
 					destroy_session_list(usr -> sessJoined);
-					assert(usr -> sessJoined == NULL);
+					usr -> sessJoined = NULL;
 					usr -> inSession = 0;
 					break;
 				}
