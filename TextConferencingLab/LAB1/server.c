@@ -70,7 +70,7 @@ void *new_client(void *arg) {
 		if((bytesRecvd = recv(newUsr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
 			perror("error recv\n");
 			exit(1);
-}
+		}
 		buffer[bytesRecvd] = '\0';
 		
 		bool toSend = 0;	// Whether to send pktSend after this loop
@@ -323,7 +323,7 @@ void *new_client(void *arg) {
 				Session *sessToSend = isValidSession(sessionList, cur -> sessionId);
 				assert(sessToSend != NULL);
 				for(User *usr = sessToSend -> usr; usr != NULL; usr = usr -> next) {
-					if((bytesRecvd = send(usr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
+					if((bytesSent = send(usr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
 						perror("error send\n");
 						exit(1);
 					}
