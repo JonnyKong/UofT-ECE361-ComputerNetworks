@@ -9,11 +9,12 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <signal.h>
+#include <sys/time.h>
 #include <pthread.h>
 
 #include "packet.h"
 #include "user.h"
-#include "session.h"
+// #include "session.h"
 
 #define ULISTFILE "userlist.txt"    // File of username and passwords   
 #define INBUF_SIZE 64   			// Input buffer
@@ -52,6 +53,9 @@ void *new_client(void *arg) {
 	char source[MAX_NAME];	// Username (valid after logged in)
 	int bytesSent, bytesRecvd;
 
+	Packet pktRecv;		// Convert received data into packet
+	Packet pktSend;		// Packet to send
+
 	printf("New thread created\n");
 
 	// FSM states
@@ -60,21 +64,21 @@ void *new_client(void *arg) {
 	// The main recv() loop
 	while(1) {
 		memset(buffer, 0, sizeof(char) * BUF_SIZE);
+		memset(&pktRecv, 0, sizeof(Packet));
+		memset(&pktRecv, 0, sizeof(Packet));		
+
 		if((bytesRecvd = recv(newUsr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
 			perror("error recv\n");
 			exit(1);
 		}
 		buffer[bytesRecvd] = '\0';
-		Packet pktRecv;		// Convert data into a new packet
-		Packet pktSend;		// Packet to send
+		
 		bool toSend = 0;	// Whether to send pktSend after this loop
 		printf("Message received: \"%s\"\n", buffer);
 
 		stringToPacket(buffer, &pktRecv);
 		memset(&pktSend, 0, sizeof(Packet));
 
-
-		/************ Finite State Machine *************/
 
 		// Can exit anytime
 		if(pktRecv.type == EXIT) {
@@ -96,9 +100,9 @@ void *new_client(void *arg) {
 			pthread_mutex_lock(&userConnectedCnt_mutex);
 			--userConnectedCnt;
 			pthread_mutex_unlock(&userConnectedCnt_mutex);
-			
+
 			if(loggedin) {
-				printf("User %s exiting...\n", newUsr -> uname);
+				printf("User %s exiting...\n", source);
 			} else {
 				printf("User exiting...\n");
 			}
@@ -112,14 +116,21 @@ void *new_client(void *arg) {
 			if(pktRecv.type == LOGIN) {	
 				// Parse and check username and password
 				int cursor = 0;
-				while(pktRecv.data[cursor] != ' ') ++cursor;
-				memcpy(newUsr -> uname, (char *)(pktRecv.data), cursor);
-				strcpy(newUsr -> pwd, (char *)(pktRecv.data + cursor + 1));
+				strcpy(newUsr -> uname, (char *)(pktRecv.source));
+				strcpy(newUsr -> pwd, (char *)(pktRecv.data));
+				printf("User Name: %s\n", newUsr -> uname);
+				printf("User pwd: %s\n", newUsr -> pwd);
+				
+				// Check if user already joined
+				bool alreadyJnd = in_list(userLoggedin, newUsr);				
+	
 				bool vldusr = is_valid_user(userList, newUsr);
 				// Clear user password for safety
 				memset(newUsr -> pwd, 0, PWDLEN);
 				
-				if(vldusr) {
+				if(vldusr && !alreadyJnd) {
+					printf("User is valid\n");
+				
 					pktSend.type = LO_ACK;
 					toSend = 1;
 					loggedin = 1;
@@ -131,13 +142,20 @@ void *new_client(void *arg) {
 					userLoggedin = add_user(userLoggedin, tmp);
 					pthread_mutex_unlock(&userLoggedin_mutex);
 
+					// Save username
+					strcpy(source, newUsr -> uname);
+
 					printf("User %s: Successfully logged in...\n", newUsr -> uname);
 
 				} else {
+					printf("User is not valid\n");	
+			
 					pktSend.type = LO_NAK;
 					toSend = 1;
 					// Respond with reason for failure
-					if(in_list(userList, newUsr)) {	
+					if(alreadyJnd) {
+						strcpy((char *)(pktSend.data), "Multiple log-in");
+					} else if(in_list(userList, newUsr)) {	
 						strcpy((char *)(pktSend.data), "Wrong password");
 					} else {
 						strcpy((char *)(pktSend.data), "User not registered");
@@ -192,13 +210,24 @@ void *new_client(void *arg) {
 				sessJoined = init_session(sessJoined, sessionId);
 
 				printf("User %s: Succeeded join session %d\n", newUsr -> uname, sessionId);
+				
+				// Update user status in userConnected
+				pthread_mutex_lock(&userLoggedin_mutex);
+				for(User *usr = userLoggedin; usr != NULL; usr = usr -> next) {
+					if(strcmp(usr -> uname, source) == 0) {
+						usr -> inSession = 1;
+						usr -> sessJoined = init_session(usr -> sessJoined, sessionId);
+					}
+				}
+				pthread_mutex_unlock(&userLoggedin_mutex);
+
 			}
 		}
 
 
 		// User logged in, leave session, no reply
 		else if(pktRecv.type == LEAVE_SESS) {
-			printf("User %s trying to leave all sessions...:\n", newUsr -> uname);
+			printf("User %s trying to leaving all sessions:\n", newUsr -> uname);
 			
 			// Iterate until all session left
 			while(sessJoined != NULL) {
@@ -214,6 +243,17 @@ void *new_client(void *arg) {
 
 				printf("\tUser %s: Left session %d\n", newUsr -> uname, curSessId);
 			}
+
+			// Update user status in userConnected;
+			pthread_mutex_lock(&userLoggedin_mutex);
+			for(User *usr = userLoggedin; usr != NULL; usr = usr -> next) {
+				if(strcmp(usr -> uname, source) == 0) {
+					destroy_session_list(usr -> sessJoined);
+					usr -> inSession = 0;
+				}
+			}
+			pthread_mutex_unlock(&userLoggedin_mutex);
+
 		}
 
 
@@ -228,6 +268,19 @@ void *new_client(void *arg) {
 
 			// User join just created session
 			sessJoined = init_session(sessJoined, sessionCnt);
+			pthread_mutex_lock(&sessionList_mutex);
+			sessionList = join_session(sessionList, sessionCnt, newUsr);
+			pthread_mutex_unlock(&sessionList_mutex);
+			
+			// Update user status in userLoggedin;
+			pthread_mutex_lock(&userLoggedin_mutex);
+			for(User *usr = userLoggedin; usr != NULL; usr = usr -> next) {
+				if(strcmp(usr -> uname, source) == 0) {
+					usr -> inSession = 1;
+					usr -> sessJoined = init_session(usr -> sessJoined, sessionCnt);
+				}
+			}
+			pthread_mutex_unlock(&userLoggedin_mutex);
 
 			// Update pktSend NS_ACK
 			pktSend.type = NS_ACK;
@@ -246,7 +299,7 @@ void *new_client(void *arg) {
 
 		// User send message
 		else if(pktRecv.type == MESSAGE) {
-			printf("User %s: Sending message...\n", newUsr -> uname);
+			printf("User %s: Sending message \"%s\"\n", newUsr -> uname, pktRecv.data);
 
 			// Prepare message to be sent
 			memset(&pktSend, 0, sizeof(Packet));
@@ -256,19 +309,21 @@ void *new_client(void *arg) {
 			pktSend.size = strlen((char *)(pktSend.data));
 			
 			// Use recv() buffer
-			memset(recv, 0, sizeof(char) * BUF_SIZE);
+			memset(buffer, 0, sizeof(char) * BUF_SIZE);
 			packetToString(&pktSend, buffer);
+			printf("Server: Broadcasting message: \"%s\"\n", buffer);
 
 			// Send though local session list
 			for(Session *cur = sessJoined; cur != NULL; cur = cur -> next) {
 				/* Send this message to all users in this session.
 				 * User may receive duplicate messages.
 				 */
+
 				// Find corresponding session in global sessionList
 				Session *sessToSend = isValidSession(sessionList, cur -> sessionId);
 				assert(sessToSend != NULL);
 				for(User *usr = sessToSend -> usr; usr != NULL; usr = usr -> next) {
-					if((bytesRecvd = send(usr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
+					if((bytesSent = send(usr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
 						perror("error send\n");
 						exit(1);
 					}
@@ -281,21 +336,34 @@ void *new_client(void *arg) {
 		// Respond user query
 		else if(pktRecv.type == QUERY) {
 			
-			printf("User %s: Making query...\n", newUsr -> uname);
+			printf("User %s: Making query\n", newUsr -> uname);
 
 			int cursor = 0;
 			pktSend.type = QU_ACK;
 			toSend = 1;
-			/* Interate thorugh all sessions, output format:
-			 * Session1: user1 user2 user3
-			 * Session2: user5 user3 user6
-			 */
-			for(Session *curSess = sessionList; curSess != NULL; curSess = curSess -> next) {
-				cursor += sprintf((char *)(pktSend.data) + cursor, "Session %d:", curSess -> sessionId);
-				for(User *usr = curSess -> usr; usr != NULL; usr = usr -> next) {
-					cursor += sprintf((char *)(pktSend.data) + cursor, "\t%s", usr -> uname);
+
+			// for(Session *curSess = sessionList; curSess != NULL; curSess = curSess -> next) {
+			// 	cursor += sprintf((char *)(pktSend.data) + cursor, "Session %d:", curSess -> sessionId);
+			// 	for(User *usr = curSess -> usr; usr != NULL; usr = usr -> next) {
+			// 		cursor += sprintf((char *)(pktSend.data) + cursor, "\t%s", usr -> uname);
+			// 	}
+			// 	// Add carrige return after each session
+			// 	pktSend.data[cursor++] = '\n';
+			// }
+			// // Users not in any session
+			// cursor += sprintf((char *)(pktSend.data) + cursor, "Not In Any Session:");
+			// for(User *usr = userLoggedin; usr != NULL; usr = usr -> next) {
+			// 	if(usr -> inSession == 0) {
+			// 		cursor += sprintf((char *)(pktSend.data) + cursor, "\t%s", usr -> uname);
+			// 	}
+			// }
+			// printf("\n");
+			
+			for(User *usr = userLoggedin; usr != NULL; usr = usr -> next) {
+				cursor += sprintf((char *)(pktSend.data) + cursor, "%s", usr -> uname);
+				for(Session *sess = usr -> sessJoined; sess != NULL; sess = sess -> next) {
+					cursor += sprintf((char *)(pktSend.data) + cursor, "\t%d", sess -> sessionId);
 				}
-				// Add carrige return after each session
 				pktSend.data[cursor++] = '\n';
 			}
 
@@ -307,11 +375,14 @@ void *new_client(void *arg) {
 			// Add source and size for pktSend and send packet
 			memcpy(pktSend.source, newUsr -> uname, UNAMELEN);
 			pktSend.size = strlen((char *)(pktSend.data));
-
+			
+			memset(buffer, 0, BUF_SIZE);
+			packetToString(&pktSend, buffer);
 			if((bytesRecvd = send(newUsr -> sockfd, buffer, BUF_SIZE - 1, 0)) == -1) {
 				perror("error send\n");
 			}
 		}
+		printf("\n");
 	}
 
 }
@@ -343,6 +414,7 @@ int main() {
 
     // Setup server
 	int sockfd;     // listen on sock_fd, new connection on new_fd
+	
 	// int new_fd;		
 	struct addrinfo hints, *servinfo, *p;
 	struct sockaddr_storage their_addr; // connector's address information
@@ -386,7 +458,14 @@ int main() {
 		fprintf(stderr, "Server: failed to bind\n");
 		exit(1);
     }
-    
+    // Server exits after a while if no user online
+	struct timeval timeout;
+	timeout.tv_sec = 300;
+	timeout.tv_usec = 0;
+	if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (void *)&timeout, sizeof(timeout)) < 0) {
+		fprintf(stderr, "setsockopt failed\n");
+	}
+
 
     // Listen on incoming port
     if (listen(sockfd, BACKLOG) == -1) {
@@ -397,39 +476,38 @@ int main() {
 
     
 	// main accept() loop
-	while(1) {
 
-		// Accept new incoming connections 
-		User *newUsr = calloc(sizeof(User), 1);
-		sin_size = sizeof(their_addr);
-		newUsr -> sockfd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
-		if (newUsr -> sockfd == -1) {
-			perror("accept");
-			continue;
+	do {
+		while(1) {
+
+			// Accept new incoming connections 
+			User *newUsr = calloc(sizeof(User), 1);
+			sin_size = sizeof(their_addr);
+			newUsr -> sockfd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+			if (newUsr -> sockfd == -1) {
+				perror("accept");
+				break;
+			}
+			inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof(s));
+			printf("Server: got connection from %s\n", s);
+
+			// Increment userConnectedCnt
+			pthread_mutex_lock(&userConnectedCnt_mutex);
+			++userConnectedCnt;
+			pthread_mutex_unlock(&userConnectedCnt_mutex);
+
+			// Create new thread to handle the new socket
+			pthread_create(&(newUsr -> p), NULL, new_client, (void *)newUsr);
+
 		}
-		inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof(s));
-		printf("Server: got connection from %s\n", s);
-
-		// Increment userConnectedCnt
-		pthread_mutex_lock(&userConnectedCnt_mutex);
-		++userConnectedCnt;
-		pthread_mutex_unlock(&userConnectedCnt_mutex);
-
-		// Create new thread to handle the new socket
-		pthread_create(&(newUsr -> p), NULL, new_client, (void *)newUsr);
-
-		// Temp: server quites as last user leaves session
-		if(userConnectedCnt == 0) {
-			printf("All user have left session, server terminating...\n");
-			break;
-		}
-	}
+	} while(userConnectedCnt > 0);
 
 
 	// Free global memory on exit
 	destroy_userlist(userList);
 	destroy_userlist(userLoggedin);
 	destroy_session_list(sessionList);
+	close(sockfd);
 	printf("Server Terminated\n");
     return 0;
 }
