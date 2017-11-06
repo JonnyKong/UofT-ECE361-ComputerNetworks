@@ -376,10 +376,10 @@ void *new_client(void *arg) {
 	// Thread exits, no ACK packet sent, close socket
 	close(newUsr -> sockfd);
 	
-	// Leave all session before user exits
+	// Leave all session before user exits, remove from sessionList
 	for(Session *cur = sessJoined; cur != NULL; cur = cur -> next) {
 		pthread_mutex_lock(&sessionList_mutex);
-		sessionList = remove_session(sessionList, cur -> sessionId);
+		sessionList = leave_session(sessionList, cur -> sessionId, newUsr);
 		pthread_mutex_unlock(&sessionList_mutex);
 	}
 
