@@ -23,7 +23,6 @@ enum msgType {
     QUERY,
     QU_ACK,
     INVIT,
-    INV_ACK
 };
 
 typedef struct lab3message {
