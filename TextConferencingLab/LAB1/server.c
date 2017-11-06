@@ -386,7 +386,7 @@ void *new_client(void *arg) {
 	// Remove from global userConnected
 	for(User *usr = userLoggedin; usr != NULL; usr = usr -> next) {
 		if(strcmp(source, usr -> uname) == 0) {
-			sessJoined = destroy_session_list(sessJoined);
+			destroy_session_list(sessJoined);
 			break;
 		}
 	}
