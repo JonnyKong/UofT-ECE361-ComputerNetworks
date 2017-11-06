@@ -292,7 +292,7 @@ void *new_client(void *arg) {
 			// Use recv() buffer
 			memset(buffer, 0, sizeof(char) * BUF_SIZE);
 			packetToString(&pktSend, buffer);
-			printf("Server: Broadcasting message: \"%s\"\n", buffer);
+			printf("Server: Broadcasting message to session %d: \"%s\"\n", buffer, curSess);
 
 			// Send though local session list
 			for(Session *cur = sessJoined; cur != NULL; cur = cur -> next) {
@@ -395,6 +395,7 @@ void *new_client(void *arg) {
 	} else {
 		printf("User exiting...\n");
 	}
+	printf('\n');
 	return NULL;
 
 }
