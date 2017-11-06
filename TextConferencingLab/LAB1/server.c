@@ -49,8 +49,8 @@ void *new_client(void *arg) {
 
 	User *newUsr = (User*)arg;
 	Session *sessJoined = NULL;	// List of sessions joined
-	char buffer[BUF_SIZE];	// Buffer for recv()
-	char source[MAX_NAME];	// Username (valid after logged in)
+	char buffer[BUF_SIZE] = {0};	// Buffer for recv()
+	char source[MAX_NAME] = {0};	// Username (valid after logged in)
 	int bytesSent, bytesRecvd;
 
 	Packet pktRecv;		// Convert received data into packet
@@ -74,7 +74,7 @@ void *new_client(void *arg) {
 		buffer[bytesRecvd] = '\0';
 		
 		bool toSend = 0;	// Whether to send pktSend after this loop
-		printf("Message received: \"%s\"\n", buffer);
+		printf("Message from user %s: %s\n", buffer, source);
 
 		stringToPacket(buffer, &pktRecv);
 		memset(&pktSend, 0, sizeof(Packet));
