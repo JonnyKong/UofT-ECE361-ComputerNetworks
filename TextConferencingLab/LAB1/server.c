@@ -390,7 +390,7 @@ void *new_client(void *arg) {
 			break;
 		}
 	}
-	userConnected = remove_user(userConnected, newUsr);
+	userLoggedin = remove_user(userLoggedin, newUsr);
 
 	// remove private session list, free memory
 	destroy_session_list(sessionList);
