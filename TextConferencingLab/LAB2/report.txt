@@ -1,0 +1,7 @@
+Design of server:
+
+The server is composed of multiple threads implemented with Pthread. A Main thread sets up the welcoming port and spawns child threads, with one child handling one new TCP connection. The child thread first checks the password, then parses user commands. 
+
+For joining multiple sessions, we used lists to keep track of sessions a corresponding user have joined. Many shared data structures are also used to allow communication between threads. For examples, each child thread keeps the sessions its user joined, and also updates the shared data structures which records the status of all users. Locks are employed to ensure necessary synchronization.
+
+For the invitation function in section 2, the server forwards the invitation by letting the inviter's thread call the invitee's socket to send invitation message, which is made possible by shared data structures. We set up new packet types to support invitation.
