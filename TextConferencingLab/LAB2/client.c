@@ -77,7 +77,7 @@ void *receive(void *socketfd_void_p) {
       }
       fprintf(stdout, "User id\t\tSession ids\n%s", packet.data);
     } else if (packet.type == MESSAGE){   
-      fprintf(stdout, "You received a new message\n%s: %s\n", packet.source, packet.data);
+      fprintf(stdout, "\n--------%s: %s\n", packet.source, packet.data);
     } else if (packet.type == INVIT) { 
       pthread_mutex_lock(&invit_mutex);
       invit = true;
