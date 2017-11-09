@@ -52,6 +52,7 @@ void *receive(void *socketfd_void_p) {
 			fprintf(stderr, "client receive: recv\n");
 			return NULL;
 		}
+		if (numbytes == 0) continue;
     buf[numbytes] = 0;
     //fprintf(stdout, "buf: %s\n", buf);
 		stringToPacket(buf, &packet);
