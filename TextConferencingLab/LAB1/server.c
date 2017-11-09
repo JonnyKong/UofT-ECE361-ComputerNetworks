@@ -72,6 +72,7 @@ void *new_client(void *arg) {
 			perror("error recv\n");
 			exit(1);
 		}
+		if(bytesRecvd == 0) toExit = 1;
 		buffer[bytesRecvd] = '\0';
 		
 		bool toSend = 0;	// Whether to send pktSend after this loop
