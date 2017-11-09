@@ -33,6 +33,7 @@ void *receive(void *socketfd_void_p) {
 			fprintf(stderr, "client receive: recv\n");
 			return NULL;
 		}
+	if (numbytes == 0) continue;
     buf[numbytes] = 0;
     //fprintf(stdout, "buf: %s\n", buf);
 		stringToPacket(buf, &packet);
@@ -49,7 +50,7 @@ void *receive(void *socketfd_void_p) {
     } else if (packet.type == QU_ACK) {
       fprintf(stdout, "User id\t\tSession ids\n%s", packet.data);
     } else if (packet.type == MESSAGE){   
-      fprintf(stdout, "%s: %s\n", packet.source, packet.data);
+      	fprintf(stdout, "%s: %s\n", packet.source, packet.data);
     } else {
       fprintf(stdout, "Unexpected packet received: type %d, data %s\n",
           packet.type, packet.data);
