@@ -18,4 +18,10 @@ Implemented a simple client/server program, which interact each other to transfe
 * Various file formats (but not binary files)
 
 ## The Text Conferencing Lab
-
+This lab uses UNIX TCP sockets to implement a simple text conferencing application. The following features have been implemented:
+* Multiple users
+* Users must log in with credentials. Server maintains a database for registered users. 
+* Group chat support
+* Domain name resolution
+* Allow inviting other users to a group chat
+* Browse which users are currently online
