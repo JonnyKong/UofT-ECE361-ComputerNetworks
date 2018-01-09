@@ -3,8 +3,19 @@ This is the lab projects for the course 'Computer Networks I' from the Universit
 
 ## Wireshark Labs
 This lab involves using the Wireshark, a packet sniffer software to observe various network in action. The wireshark lab includes five specific labs:
-1. HTTP
-2. UDP
-3. TCP
-4. IP
-5. Ethernet
+1. HTTP: The basic GET/response interaction, HTTP message formats, retrieving large HTML files, retrieving objects, and HTTP authentication/security.
+2. UDP: Capturing UDP traces.
+3. TCP: Sequence and acknowledgememt numbers, flow-control, congestion-control, TCP connection setup.
+4. IP: Analyze IP traces with traceroute, IP datagram, IP fragmentation.
+5. Ethernet: Ethernet and ARP protocal.
+
+## The File Transfer Lab
+Implemented a simple client/server program, which interact each other to transfer a file in a connectionless manner. This (fake) file transfer protocal is based on UNIX sockets, and the following features have been implemented:
+* This protocol is based on UDP, but uses acknowledgements to guarantee reliable transfer 
+* Flow control
+* Congestion control
+* Domain Name Resolution
+* Various file formats (but not binary files)
+
+## The Text Conferencing Lab
+
